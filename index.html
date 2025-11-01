@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система оценки звонков менеджеров</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Блок авторизации по паролю -->
+        <div id="auth-section" class="auth-section">
+            <div class="auth-form">
+                <h2>🔐 Вход в систему оценки звонков</h2>
+                <input type="password" id="password" placeholder="Введите пароль" required>
+                <button id="login-btn" class="auth-btn primary">Войти</button>
+                <div id="auth-message" class="auth-message"></div>
+            </div>
+        </div>
+
+        <!-- Основное приложение -->
+        <div id="app-content" class="hidden">
+            <header>
+                <h1>📊 Система оценки звонков менеджеров</h1>
+                <div class="user-info">
+                    <button id="logout-btn" class="logout-btn">Выйти</button>
+                </div>
+            </header>
+
+            <nav class="tabs">
+                <button class="tab-button active" data-tab="evaluation">➕ Новая оценка</button>
+                <button class="tab-button" data-tab="view">👁️ Просмотр оценок</button>
+                <button class="tab-button" data-tab="stats">📈 Статистика</button>
+            </nav>
+
+            <!-- Вкладка новой оценки -->
+            <div id="evaluation" class="tab-content active">
+                <form id="evaluationForm" class="evaluation-form">
+                    <div class="form-section">
+                        <h3>📋 Основная информация</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="evaluationDate">Дата проверки:</label>
+                                <input type="date" id="evaluationDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="managerName">ФИО МП:</label>
+                                <select id="managerName" required>
+                                    <option value="">Выберите МП</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="phoneNumber">Номер телефона:</label>
+                                <input type="tel" id="phoneNumber">
+                            </div>
+                            <div class="form-group">
+                                <label for="leadLink">Ссылка на лид:</label>
+                                <input type="url" id="leadLink">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="callDate">Дата звонка:</label>
+                                <input type="date" id="callDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="callDuration">Длительность звонка (ч:мм:сс):</label>
+                                <input type="text" id="callDuration" placeholder="00:00:00" pattern="[0-9]{2}:[0-9]{2}:[0-9]{2}" required>
+                                <small class="input-hint">Формат: 00:00:00</small>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="isTarget">Целевой:</label>
+                                <select id="isTarget" required>
+                                    <option value="да">Да</option>
+                                    <option value="нет">Нет</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="laterWork">Искал работу на более позднее время:</label>
+                                <select id="laterWork" required>
+                                    <option value="да">Да</option>
+                                    <option value="нет">Нет</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Критерии оценки -->
+                    <div class="criteria-section">
+                        <!-- Установление контакта -->
+                        <div class="criterion">
+                            <h3>🤝 Установление контакта (30 баллов)</h3>
+                            <div class="score-input">
+                                <label>Баллы:</label>
+                                <input type="number" id="contactScore" min="0" max="30" value="0" required>
+                            </div>
+                            <div class="comment-group">
+                                <label>Короткие ошибки:</label>
+                                <div class="errors-checkbox-group">
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError1" value="Не представился">
+                                        <label for="contactError1">Не представился</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError2" value="Не назвал компанию">
+                                        <label for="contactError2">Не назвал компанию</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError3" value="Не поздоровался">
+                                        <label for="contactError3">Не поздоровался</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError4" value="Не спросил пол">
+                                        <label for="contactError4">Не спросил пол</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError5" value="Не спросил возраст">
+                                        <label for="contactError5">Не спросил возраст</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError6" value="Спросил предпочитаемый регион">
+                                        <label for="contactError6">Спросил предпочитаемый регион</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError7" value="Спросил, на какую зп рассчитывает">
+                                        <label for="contactError7">Спросил, на какую зп рассчитывает</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError8" value="Не спросил гражданство">
+                                        <label for="contactError8">Не спросил гражданство</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError9" value="Отказал по возрасту/полу/национальности">
+                                        <label for="contactError9">Отказал по возрасту/полу/национальности</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError10" value="Не спросил про судимость">
+                                        <label for="contactError10">Не спросил про судимость</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="contactError11" value="Оказался нецелевым">
+                                        <label for="contactError11">Оказался нецелевым</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="comment-group">
+                                <label for="contactComment">Развёрнутый комментарий:</label>
+                                <textarea id="contactComment" placeholder="Подробное описание..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Презентация/Предложение -->
+                        <div class="criterion">
+                            <h3>🎯 Презентация/Предложение (30 баллов)</h3>
+                            <div class="score-input">
+                                <label>Баллы:</label>
+                                <input type="number" id="presentationScore" min="0" max="30" value="0" required>
+                            </div>
+                            <div class="comment-group">
+                                <label>Короткие ошибки:</label>
+                                <div class="errors-checkbox-group">
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="presentationError1" value="Не было выявления потребности">
+                                        <label for="presentationError1">Не было выявления потребности</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="presentationError2" value="Предложение не по приоритету">
+                                        <label for="presentationError2">Предложение не по приоритету</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="presentationError3" value="Не учёл мотивы">
+                                        <label for="presentationError3">Не учёл мотивы</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="presentationError4" value="Неполные данные о вакансии">
+                                        <label for="presentationError4">Неполные данные о вакансии</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="presentationError5" value="Неверные данные о вакансии">
+                                        <label for="presentationError5">Неверные данные о вакансии</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="presentationError6" value="Слитый лид">
+                                        <label for="presentationError6">Слитый лид</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="presentationError7" value="Презентовал монотонно/шаблонно и без акцентов">
+                                        <label for="presentationError7">Презентовал монотонно/шаблонно и без акцентов</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="presentationError8" value="Намеренно ввёл в заблуждение">
+                                        <label for="presentationError8">Намеренно ввёл в заблуждение</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="comment-group">
+                                <label for="presentationComment">Развёрнутый комментарий:</label>
+                                <textarea id="presentationComment" placeholder="Подробное описание..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Отработка возражений -->
+                        <div class="criterion">
+                            <h3>🛡️ Отработка возражений (30 баллов)</h3>
+                            <div class="score-input">
+                                <label>Баллы:</label>
+                                <input type="number" id="objectionsScore" min="0" max="30" value="0" required>
+                            </div>
+                            <div class="comment-group">
+                                <label>Короткие ошибки:</label>
+                                <div class="errors-checkbox-group">
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="objectionsError1" value="Не предложил замену">
+                                        <label for="objectionsError1">Не предложил замену</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="objectionsError2" value="Отработал не все возражения">
+                                        <label for="objectionsError2">Отработал не все возражения</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="objectionsError3" value="Не отработал возражения">
+                                        <label for="objectionsError3">Не отработал возражения</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="objectionsError4" value="Не презентовал после замены">
+                                        <label for="objectionsError4">Не презентовал после замены</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="objectionsError5" value="Не оставил комментарий в Битриксе">
+                                        <label for="objectionsError5">Не оставил комментарий в Битриксе</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="objectionsError6" value="Не довёл продажу до финала">
+                                        <label for="objectionsError6">Не довёл продажу до финала</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="comment-group">
+                                <label for="objectionsComment">Развёрнутый комментарий:</label>
+                                <textarea id="objectionsComment" placeholder="Подробное описание..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- Завершение -->
+                        <div class="criterion">
+                            <h3>✅ Завершение (10 баллов)</h3>
+                            <div class="score-input">
+                                <label>Баллы:</label>
+                                <input type="number" id="closingScore" min="0" max="10" value="0" required>
+                            </div>
+                            <div class="comment-group">
+                                <label>Короткие ошибки:</label>
+                                <div class="errors-checkbox-group">
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="closingError1" value="Не озвучены дальнейшие действия">
+                                        <label for="closingError1">Не озвучены дальнейшие действия</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="closingError2" value="Перевёл в вотсап без озвучивания договорённостей">
+                                        <label for="closingError2">Перевёл в вотсап без озвучивания договорённостей</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="closingError3" value="Не презентовал мультиссылку">
+                                        <label for="closingError3">Не презентовал мультиссылку</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="comment-group">
+                                <label for="closingComment">Развёрнутый комментарий:</label>
+                                <textarea id="closingComment" placeholder="Подробное описание..."></textarea>
+                            </div>
+                        </div>
+
+                        <!-- TOV -->
+                        <div class="criterion">
+                            <h3>⚡ TOV (Пока без снижения)</h3>
+                            <div class="score-input">
+                                <label>Баллы:</label>
+                                <input type="number" id="tovScore" min="0" max="0" value="0" readonly>
+                            </div>
+                            <div class="comment-group">
+                                <label>Короткие ошибки:</label>
+                                <div class="errors-checkbox-group">
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError1" value="Игнорирование эмоций">
+                                        <label for="tovError1">Игнорирование эмоций</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError2" value="Отсутствие присоединения">
+                                        <label for="tovError2">Отсутствие присоединения</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError3" value="Монотонная речь">
+                                        <label for="tovError3">Монотонная речь</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError4" value="Отсутствие энтузиазма">
+                                        <label for="tovError4">Отсутствие энтузиазма</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError5" value="Шаблонность или заученность">
+                                        <label for="tovError5">Шаблонность или заученность</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError6" value="Неуверенность">
+                                        <label for="tovError6">Неуверенность</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError7" value="Перебивание">
+                                        <label for="tovError7">Перебивание</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError8" value="Пассивная агрессия">
+                                        <label for="tovError8">Пассивная агрессия</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError9" value="Насмешки или сарказм">
+                                        <label for="tovError9">Насмешки или сарказм</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError10" value="Ровно">
+                                        <label for="tovError10">Ровно</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError11" value="Присоединение/поддержка">
+                                        <label for="tovError11">Присоединение/поддержка</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError12" value="Живая речь">
+                                        <label for="tovError12">Живая речь</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError13" value="Гибкость и адаптивность">
+                                        <label for="tovError13">Гибкость и адаптивность</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError14" value="Энтузиазм">
+                                        <label for="tovError14">Энтузиазм</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError15" value="Уверенность или напористость">
+                                        <label for="tovError15">Уверенность или напористость</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError16" value="Активное слушание">
+                                        <label for="tovError16">Активное слушание</label>
+                                    </div>
+                                    <div class="error-checkbox">
+                                        <input type="checkbox" id="tovError17" value="Доброжелательность">
+                                        <label for="tovError17">Доброжелательность</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="comment-group">
+                                <label for="tovComment">Развёрнутый комментарий:</label>
+                                <textarea id="tovComment" placeholder="Подробное описание..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Итоги -->
+                    <div class="summary-section">
+                        <div class="form-group">
+                            <label for="criticalError">🚨 Критическая ошибка:</label>
+                            <input type="text" id="criticalError" placeholder="Опишите критическую ошибку, если есть">
+                        </div>
+                        <div class="form-group">
+                            <label for="overallComment">💬 Общий комментарий:</label>
+                            <textarea id="overallComment" placeholder="Общие замечания по звонку..."></textarea>
+                        </div>
+                        <div class="total-score">
+                            <h3>Итоговый балл: <span id="totalScoreDisplay">0</span>/100</h3>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn">💾 Сохранить оценку</button>
+                </form>
+            </div>
+
+            <!-- Вкладка просмотра -->
+            <div id="view" class="tab-content">
+                <div class="view-controls">
+                    <div class="filter-section">
+                        <h3>🔍 Фильтры</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="viewStartDate">Начальная дата:</label>
+                                <input type="date" id="viewStartDate">
+                            </div>
+                            <div class="form-group">
+                                <label for="viewEndDate">Конечная дата:</label>
+                                <input type="date" id="viewEndDate">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Выберите МП:</label>
+                            <div id="managerFilter" class="manager-filter">
+                                <!-- Чекбоксы менеджеров будут заполнены через JavaScript -->
+                            </div>
+                        </div>
+                        <div class="filter-actions">
+                            <button id="applyFilters" class="action-btn">Применить фильтры</button>
+                            <button id="clearFilters" class="action-btn secondary">Сбросить</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="view-controls" style="margin-top: 20px;">
+                    <input type="text" id="searchInput" placeholder="🔍 Поиск по ФИО МП..." style="flex: 1;">
+                    <button id="exportBtn" class="action-btn">📥 Экспорт в CSV</button>
+                </div>
+                
+                <div id="evaluationsList" class="evaluations-list"></div>
+            </div>
+
+            <!-- Вкладка статистики -->
+            <div id="stats" class="tab-content">
+                <div class="stats-controls">
+                    <div class="filter-section">
+                        <h3>📊 Параметры статистики</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="statsStartDate">Начальная дата:</label>
+                                <input type="date" id="statsStartDate">
+                            </div>
+                            <div class="form-group">
+                                <label for="statsEndDate">Конечная дата:</label>
+                                <input type="date" id="statsEndDate">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Выберите МП для детальной статистики:</label>
+                            <div id="statsManagerFilter" class="manager-filter">
+                                <!-- Чекбоксы менеджеров будут заполнены через JavaScript -->
+                            </div>
+                            <small class="input-hint">Оставьте пустым для общей статистики по всем менеджерам</small>
+                        </div>
+                        <div class="filter-actions">
+                            <button id="calculateStats" class="action-btn">📊 Рассчитать статистику</button>
+                            <button id="clearStatsFilters" class="action-btn secondary">Сбросить</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="statsResults" class="stats-results"></div>
+                <div id="additionalStats" class="additional-stats"></div>
+                <div id="errorsStats" class="errors-stats"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
