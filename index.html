@@ -6,6 +6,7 @@
     <title>Система оценки звонков менеджеров</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -412,7 +413,7 @@
                 
                 <div class="view-controls" style="margin-top: 20px;">
                     <input type="text" id="searchInput" placeholder="🔍 Поиск по ФИО МП..." style="flex: 1;">
-                    <button id="exportBtn" class="action-btn">📥 Экспорт в CSV</button>
+                    <button id="exportBtn" class="action-btn">📊 Экспорт в Excel</button>
                 </div>
                 
                 <div id="evaluationsList" class="evaluations-list"></div>
@@ -441,7 +442,7 @@
                             <small class="input-hint">Оставьте пустым для общей статистики по всем менеджерам</small>
                         </div>
                         <div class="filter-actions">
-                            <button id="calculateStats" class="action-btn">📊 Рассчитать статистику</button>
+                            <button id="calculateStats" class="action-btn">📈 Рассчитать статистику</button>
                             <button id="clearStatsFilters" class="action-btn secondary">Сбросить</button>
                         </div>
                     </div>

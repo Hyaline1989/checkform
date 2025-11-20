@@ -1,4 +1,4 @@
-// Конфигурация Supabase
+// Конфигурация Supabase - ПРОВЕРЬТЕ ЭТИ ДАННЫЕ
 const SUPABASE_URL = 'https://nvmiufonskathseexsxi.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im52bWl1Zm9uc2thdGhzZWV4c3hpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4ODA1NzEsImV4cCI6MjA3NzQ1NjU3MX0.Fg5wkFDMGPUST-vyaOhfihOownenV9GkVhJO9xm3u5o';
 
@@ -7,23 +7,26 @@ const ACCESS_PASSWORD = 'admin123';
 
 // Список менеджеров (легко добавлять/удалять)
 const MANAGERS_LIST = [
-    'Абушева Сабина',
     'Аксюбина Ангелина',
     'Буравкина Дарья',
     'Волков Алексей',
     'Горбачева Оксана',
+    'Гусева Катерина',
     'Губина Елизавета',
     'Гурмекова Алина',
     'Долгий Олеся',
+    'Еленник Алония',
     'Емельянова Виктория',
     'Жирякова Оксана',
     'Конаныхина Татьяна',
     'Криштоп Эльза',
     'Лазарева Полина',
     'Лосев Николай',
+    'Манаенкова Ольга',
     'Мищенко Дарья',
     'Прохина Алёна',
     'Талерчик Вячеслав',
+    'Фролкина Анастасия',
     'Фролова Диана',
     'Ходневич София',
     'Чупрунова Ирина',
@@ -32,13 +35,14 @@ const MANAGERS_LIST = [
 
 class CallEvaluationSystem {
     constructor() {
-        this.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         this.isAuthenticated = false;
         this.evaluations = [];
         this.filteredEvaluations = [];
         this.selectedManagers = [];
         this.statsSelectedManagers = [];
+        this.supabase = null;
         
+        this.initializeSupabase();
         this.checkAuthentication();
         this.initializeEventListeners();
         this.populateManagersList();
@@ -46,24 +50,67 @@ class CallEvaluationSystem {
         this.setupDurationInput();
     }
 
+    // ==================== ИНИЦИАЛИЗАЦИЯ SUPABASE ====================
+    initializeSupabase() {
+        try {
+            if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+                this.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                console.log('Supabase клиент инициализирован');
+            } else {
+                console.warn('Supabase не доступен, работаем в режиме демо');
+                this.supabase = null;
+            }
+        } catch (error) {
+            console.error('Ошибка инициализации Supabase:', error);
+            this.supabase = null;
+        }
+    }
+
+    // ==================== ЛОКАЛЬНОЕ ХРАНИЛИЩЕ (РЕЗЕРВНЫЙ ВАРИАНТ) ====================
+    getLocalEvaluations() {
+        try {
+            const stored = localStorage.getItem('callEvaluations');
+            return stored ? JSON.parse(stored) : [];
+        } catch (error) {
+            console.error('Ошибка чтения из localStorage:', error);
+            return [];
+        }
+    }
+
+    saveLocalEvaluation(evaluationData) {
+        try {
+            const evaluations = this.getLocalEvaluations();
+            evaluationData.id = Date.now(); // Добавляем ID
+            evaluationData.created_at = new Date().toISOString();
+            evaluations.unshift(evaluationData);
+            localStorage.setItem('callEvaluations', JSON.stringify(evaluations));
+            return evaluationData;
+        } catch (error) {
+            console.error('Ошибка сохранения в localStorage:', error);
+            throw error;
+        }
+    }
+
     // ==================== ФОРМАТ ДЛИТЕЛЬНОСТИ ====================
     setupDurationInput() {
         const durationInput = document.getElementById('callDuration');
-        durationInput.addEventListener('input', (e) => {
-            let value = e.target.value.replace(/\D/g, '');
-            if (value.length > 6) {
-                value = value.substring(0, 6);
-            }
-            
-            if (value.length >= 2) {
-                value = value.substring(0, 2) + ':' + value.substring(2);
-            }
-            if (value.length >= 5) {
-                value = value.substring(0, 5) + ':' + value.substring(5);
-            }
-            
-            e.target.value = value;
-        });
+        if (durationInput) {
+            durationInput.addEventListener('input', (e) => {
+                let value = e.target.value.replace(/\D/g, '');
+                if (value.length > 6) {
+                    value = value.substring(0, 6);
+                }
+                
+                if (value.length >= 2) {
+                    value = value.substring(0, 2) + ':' + value.substring(2);
+                }
+                if (value.length >= 5) {
+                    value = value.substring(0, 5) + ':' + value.substring(5);
+                }
+                
+                e.target.value = value;
+            });
+        }
     }
 
     // ==================== ФИЛЬТРАЦИЯ ПО МЕНЕДЖЕРАМ ====================
@@ -74,6 +121,8 @@ class CallEvaluationSystem {
 
     populateManagerCheckboxes(containerId, selectedArray) {
         const container = document.getElementById(containerId);
+        if (!container) return;
+        
         container.innerHTML = '';
         
         MANAGERS_LIST.forEach(manager => {
@@ -99,7 +148,6 @@ class CallEvaluationSystem {
                         selectedArray.splice(index, 1);
                     }
                 }
-                console.log(`Обновлен ${containerId}:`, selectedArray);
             });
             
             checkboxDiv.appendChild(checkbox);
@@ -111,6 +159,8 @@ class CallEvaluationSystem {
     // ==================== ЗАПОЛНЕНИЕ СПИСКА МП ====================
     populateManagersList() {
         const managerSelect = document.getElementById('managerName');
+        if (!managerSelect) return;
+        
         managerSelect.innerHTML = '<option value="">Выберите МП</option>';
         
         MANAGERS_LIST.forEach(manager => {
@@ -149,14 +199,23 @@ class CallEvaluationSystem {
     }
 
     showAuth() {
-        document.getElementById('auth-section').classList.remove('hidden');
-        document.getElementById('app-content').classList.add('hidden');
-        document.getElementById('password').value = '';
+        const authSection = document.getElementById('auth-section');
+        const appContent = document.getElementById('app-content');
+        
+        if (authSection) authSection.classList.remove('hidden');
+        if (appContent) appContent.classList.add('hidden');
+        
+        const passwordInput = document.getElementById('password');
+        if (passwordInput) passwordInput.value = '';
     }
 
     showApp() {
-        document.getElementById('auth-section').classList.add('hidden');
-        document.getElementById('app-content').classList.remove('hidden');
+        const authSection = document.getElementById('auth-section');
+        const appContent = document.getElementById('app-content');
+        
+        if (authSection) authSection.classList.add('hidden');
+        if (appContent) appContent.classList.remove('hidden');
+        
         this.loadEvaluations();
         this.updateTotalScore();
     }
@@ -260,16 +319,27 @@ class CallEvaluationSystem {
 
             console.log('Данные для сохранения:', evaluationData);
 
-            const { data, error } = await this.supabase
-                .from('evaluations')
-                .insert([evaluationData]);
+            let savedData;
+            
+            // Пытаемся сохранить в Supabase
+            if (this.supabase) {
+                const { data, error } = await this.supabase
+                    .from('evaluations')
+                    .insert([evaluationData])
+                    .select();
 
-            if (error) {
-                console.error('Ошибка Supabase:', error);
-                throw error;
+                if (error) {
+                    console.error('Ошибка Supabase:', error);
+                    throw new Error(`Supabase: ${error.message}`);
+                }
+                savedData = data[0];
+                console.log('Успешно сохранено в Supabase:', savedData);
+            } else {
+                // Сохраняем локально
+                savedData = this.saveLocalEvaluation(evaluationData);
+                console.log('Успешно сохранено локально:', savedData);
             }
 
-            console.log('Успешно сохранено:', data);
             this.showMessage('✅ Оценка успешно сохранена!', 'success');
             
             // Сброс формы
@@ -282,15 +352,11 @@ class CallEvaluationSystem {
             await this.loadEvaluations();
             
         } catch (error) {
-            console.error('Полная ошибка:', error);
+            console.error('Ошибка при сохранении:', error);
             let errorMessage = '❌ Ошибка при сохранении';
             
             if (error.message) {
                 errorMessage += ': ' + error.message;
-            } else if (error.details) {
-                errorMessage += ': ' + error.details;
-            } else if (error.code) {
-                errorMessage += ` (код: ${error.code})`;
             }
             
             this.showMessage(errorMessage, 'error');
@@ -311,27 +377,56 @@ class CallEvaluationSystem {
 
     async loadEvaluations(searchTerm = '') {
         try {
-            let query = this.supabase
-                .from('evaluations')
-                .select('*')
-                .order('created_at', { ascending: false });
+            let evaluationsData = [];
 
-            if (searchTerm) {
-                query = query.ilike('manager_name', `%${searchTerm}%`);
+            // Пытаемся загрузить из Supabase
+            if (this.supabase) {
+                let query = this.supabase
+                    .from('evaluations')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (searchTerm) {
+                    query = query.ilike('manager_name', `%${searchTerm}%`);
+                }
+
+                const { data, error } = await query;
+
+                if (error) {
+                    console.error('Ошибка Supabase при загрузке:', error);
+                    throw new Error(`Supabase: ${error.message}`);
+                }
+
+                evaluationsData = data || [];
+                console.log('Данные загружены из Supabase:', evaluationsData.length);
+            } else {
+                // Загружаем локальные данные
+                evaluationsData = this.getLocalEvaluations();
+                console.log('Данные загружены локально:', evaluationsData.length);
+                
+                // Фильтрация по поиску для локальных данных
+                if (searchTerm) {
+                    evaluationsData = evaluationsData.filter(item => 
+                        item.manager_name.toLowerCase().includes(searchTerm.toLowerCase().trim())
+                    );
+                }
             }
 
-            const { data, error } = await query;
-
-            if (error) throw error;
-
-            this.evaluations = data || [];
-            // При загрузке показываем все оценки
+            this.evaluations = evaluationsData;
             this.filteredEvaluations = [...this.evaluations];
             this.applyFilters();
             
         } catch (error) {
             console.error('Ошибка загрузки данных:', error);
-            this.showMessage('❌ Ошибка загрузки данных', 'error');
+            
+            // Показываем демо-данные при ошибке
+            this.evaluations = this.getLocalEvaluations();
+            this.filteredEvaluations = [...this.evaluations];
+            this.applyFilters();
+            
+            if (this.evaluations.length === 0) {
+                this.showMessage('⚠️ Используется локальное хранилище. Данные будут сохранены только в этом браузере.', 'info');
+            }
         }
     }
 
@@ -339,15 +434,9 @@ class CallEvaluationSystem {
     applyFilters() {
         let filtered = [...this.evaluations];
         
-        console.log('Всего оценок:', this.evaluations.length);
-        console.log('Выбранные менеджеры:', this.selectedManagers);
-        console.log('Все менеджеры в данных:', this.evaluations.map(e => e.manager_name));
-        
         // Фильтр по дате
         const startDate = document.getElementById('viewStartDate')?.value;
         const endDate = document.getElementById('viewEndDate')?.value;
-        
-        console.log('Дата начала:', startDate, 'Дата окончания:', endDate);
         
         if (startDate) {
             filtered = filtered.filter(item => {
@@ -364,16 +453,11 @@ class CallEvaluationSystem {
             });
         }
         
-        console.log('После фильтрации по дате:', filtered.length);
-        
         // Фильтр по менеджерам
         if (this.selectedManagers.length > 0) {
             filtered = filtered.filter(item => {
-                const isIncluded = this.selectedManagers.includes(item.manager_name);
-                console.log(`Менеджер "${item.manager_name}" в выбранных:`, isIncluded);
-                return isIncluded;
+                return this.selectedManagers.includes(item.manager_name);
             });
-            console.log('После фильтрации по менеджерам:', filtered.length);
         }
         
         // Поиск
@@ -382,11 +466,9 @@ class CallEvaluationSystem {
             filtered = filtered.filter(item => 
                 item.manager_name.toLowerCase().includes(searchTerm.toLowerCase().trim())
             );
-            console.log('После поиска:', filtered.length);
         }
         
         this.filteredEvaluations = filtered;
-        console.log('Итоговое количество для отображения:', this.filteredEvaluations.length);
         this.displayEvaluations();
     }
 
@@ -394,23 +476,40 @@ class CallEvaluationSystem {
         if (!confirm('Вы уверены, что хотите удалить эту оценку?')) return;
 
         try {
-            const { error } = await this.supabase
-                .from('evaluations')
-                .delete()
-                .eq('id', id);
+            let success = false;
+            
+            // Пытаемся удалить из Supabase
+            if (this.supabase) {
+                const { error } = await this.supabase
+                    .from('evaluations')
+                    .delete()
+                    .eq('id', id);
 
-            if (error) throw error;
+                if (error) throw error;
+                success = true;
+            }
+            
+            // Удаляем локально в любом случае
+            const evaluations = this.getLocalEvaluations();
+            const updatedEvaluations = evaluations.filter(item => item.id !== id);
+            localStorage.setItem('callEvaluations', JSON.stringify(updatedEvaluations));
+            success = true;
 
-            this.showMessage('✅ Оценка удалена', 'success');
-            this.loadEvaluations();
+            if (success) {
+                this.showMessage('✅ Оценка удалена', 'success');
+                this.loadEvaluations();
+            }
             
         } catch (error) {
+            console.error('Ошибка при удалении:', error);
             this.showMessage('❌ Ошибка при удалении: ' + error.message, 'error');
         }
     }
 
     displayEvaluations() {
         const container = document.getElementById('evaluationsList');
+        if (!container) return;
+        
         const evaluationsToShow = this.filteredEvaluations;
         
         if (!evaluationsToShow || evaluationsToShow.length === 0) {
@@ -548,19 +647,36 @@ class CallEvaluationSystem {
         const endDate = document.getElementById('statsEndDate')?.value;
 
         try {
-            let query = this.supabase
-                .from('evaluations')
-                .select('*');
+            let evaluationsData = [];
 
-            if (startDate && endDate) {
-                query = query.gte('call_date', startDate).lte('call_date', endDate);
+            // Пытаемся загрузить из Supabase
+            if (this.supabase) {
+                let query = this.supabase
+                    .from('evaluations')
+                    .select('*');
+
+                if (startDate && endDate) {
+                    query = query.gte('call_date', startDate).lte('call_date', endDate);
+                }
+
+                const { data, error } = await query;
+
+                if (error) throw error;
+                evaluationsData = data || [];
+            } else {
+                // Используем локальные данные
+                evaluationsData = this.getLocalEvaluations();
+                
+                // Фильтрация по дате для локальных данных
+                if (startDate && endDate) {
+                    evaluationsData = evaluationsData.filter(item => {
+                        const itemDate = new Date(item.call_date);
+                        const start = new Date(startDate);
+                        const end = new Date(endDate);
+                        return itemDate >= start && itemDate <= end;
+                    });
+                }
             }
-
-            const { data, error } = await query;
-
-            if (error) throw error;
-
-            let evaluationsData = data || [];
             
             // Фильтр по менеджерам для статистики
             if (this.statsSelectedManagers.length > 0) {
@@ -575,12 +691,17 @@ class CallEvaluationSystem {
             
         } catch (error) {
             console.error('Ошибка загрузки статистики:', error);
-            this.showMessage('❌ Ошибка загрузки статистики', 'error');
+            // Используем локальные данные при ошибке
+            const evaluationsData = this.getLocalEvaluations();
+            this.displayStatistics(evaluationsData);
+            this.displayAdditionalStats(evaluationsData);
+            this.displayErrorsStatistics(evaluationsData);
         }
     }
 
     displayStatistics(evaluationsData) {
         const container = document.getElementById('statsResults');
+        if (!container) return;
         
         if (!evaluationsData || evaluationsData.length === 0) {
             container.innerHTML = `
@@ -725,6 +846,7 @@ class CallEvaluationSystem {
 
     displayAdditionalStats(evaluationsData) {
         const container = document.getElementById('additionalStats');
+        if (!container) return;
         
         if (!evaluationsData || evaluationsData.length === 0) {
             container.innerHTML = '';
@@ -781,6 +903,7 @@ class CallEvaluationSystem {
 
     displayErrorsStatistics(evaluationsData) {
         const container = document.getElementById('errorsStats');
+        if (!container) return;
         
         if (!evaluationsData || evaluationsData.length === 0) {
             container.innerHTML = '';
@@ -894,8 +1017,8 @@ class CallEvaluationSystem {
         container.innerHTML = errorsHTML || '<p>Нет данных по ошибкам для выбранного периода</p>';
     }
 
-    // ==================== ЭКСПОРТ ====================
-    async exportToCSV() {
+    // ==================== ЭКСПОРТ В XLSX (НАСТОЯЩИЙ EXCEL) ====================
+    async exportToExcel() {
         const evaluationsToExport = this.filteredEvaluations.length > 0 ? this.filteredEvaluations : this.evaluations;
         
         if (!evaluationsToExport || evaluationsToExport.length === 0) {
@@ -903,61 +1026,144 @@ class CallEvaluationSystem {
             return;
         }
 
+        // Структура отчета для Excel
         const headers = [
-            'Дата проверки', 'Номер телефона', 'Ссылка на лид', 'ФИО МП', 'Дата звонка',
-            'Длительность звонка', 'Целевой', 'Искал работу на более позднее время',
-            'Установление контакта', 'Ошибки контакта', 'Развёрнутый комментарий',
-            'Презентация/Предложение', 'Ошибки презентации', 'Развёрнутый комментарий',
-            'Отработка возражений', 'Ошибки возражений', 'Развёрнутый комментарий',
-            'Завершение', 'Ошибки завершения', 'Развёрнутый комментарий',
-            'TOV', 'Ошибки TOV', 'Развёрнутый комментарий',
-            'Критическая ошибка', 'Итог по звонку', 'Общий комментарий'
+            'ФИО МП',
+            'Дата проверки',
+            'Дата звонка', 
+            'Длительность звонка',
+            'Целевой',
+            'Искал работу на более позднее время',
+            'Номер телефона',
+            'Ссылка на лид',
+            'Общий балл',
+            // Установление контакта
+            'Установление контакта - Баллы',
+            'Установление контакта - Ошибки',
+            'Установление контакта - Комментарий',
+            // Презентация
+            'Презентация - Баллы',
+            'Презентация - Ошибки', 
+            'Презентация - Комментарий',
+            // Отработка возражений
+            'Отработка возражений - Баллы',
+            'Отработка возражений - Ошибки',
+            'Отработка возражений - Комментарий',
+            // Завершение
+            'Завершение - Баллы',
+            'Завершение - Ошибки',
+            'Завершение - Комментарий',
+            // TOV
+            'TOV - Баллы',
+            'TOV - Ошибки',
+            'TOV - Комментарий',
+            // Дополнительно
+            'Критическая ошибка',
+            'Общий комментарий',
+            'Дата создания записи'
         ];
 
-        const csvData = evaluationsToExport.map(item => [
-            item.evaluation_date,
-            item.phone_number || '',
-            item.lead_link || '',
+        // Подготовка данных
+        const data = evaluationsToExport.map(item => [
+            // Столбец A: ФИО менеджера
             item.manager_name,
+            // Основная информация (B-H)
+            item.evaluation_date,
             item.call_date,
             item.call_duration,
             item.is_target,
             item.later_work,
+            item.phone_number || '',
+            item.lead_link || '',
+            // Общий балл (I)
+            item.total_score,
+            // Установление контакта (J-L)
             item.contact_score,
             item.contact_errors || '',
             item.contact_comment || '',
+            // Презентация (M-O)
             item.presentation_score,
             item.presentation_errors || '',
             item.presentation_comment || '',
+            // Отработка возражений (P-R)
             item.objections_score,
             item.objections_errors || '',
             item.objections_comment || '',
+            // Завершение (S-U)
             item.closing_score,
             item.closing_errors || '',
             item.closing_comment || '',
+            // TOV (V-X)
             item.tov_score,
             item.tov_errors || '',
             item.tov_comment || '',
+            // Дополнительно (Y-Z+)
             item.critical_error || '',
-            item.total_score,
-            item.overall_comment || ''
+            item.overall_comment || '',
+            new Date(item.created_at).toLocaleDateString('ru-RU')
         ]);
 
-        const csvContent = [
-            headers.join(','),
-            ...csvData.map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
-        ].join('\n');
+        try {
+            // Создаем workbook и worksheet
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
 
-        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        link.setAttribute('href', url);
-        link.setAttribute('download', `оценки_звонков_${new Date().toISOString().split('T')[0]}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        this.showMessage('✅ Данные экспортированы в CSV', 'success');
+            // Настраиваем ширину колонок для лучшего отображения
+            const colWidths = [
+                { wch: 25 }, // A: ФИО МП
+                { wch: 12 }, // B: Дата проверки
+                { wch: 12 }, // C: Дата звонка
+                { wch: 15 }, // D: Длительность
+                { wch: 10 }, // E: Целевой
+                { wch: 12 }, // F: Искал работу позже
+                { wch: 15 }, // G: Телефон
+                { wch: 20 }, // H: Ссылка
+                { wch: 12 }, // I: Общий балл
+                // Установление контакта
+                { wch: 10 }, // J: Баллы
+                { wch: 30 }, // K: Ошибки
+                { wch: 30 }, // L: Комментарий
+                // Презентация
+                { wch: 10 }, // M: Баллы
+                { wch: 30 }, // N: Ошибки
+                { wch: 30 }, // O: Комментарий
+                // Отработка возражений
+                { wch: 10 }, // P: Баллы
+                { wch: 30 }, // Q: Ошибки
+                { wch: 30 }, // R: Комментарий
+                // Завершение
+                { wch: 10 }, // S: Баллы
+                { wch: 30 }, // T: Ошибки
+                { wch: 30 }, // U: Комментарий
+                // TOV
+                { wch: 10 }, // V: Баллы
+                { wch: 30 }, // W: Ошибки
+                { wch: 30 }, // X: Комментарий
+                // Дополнительно
+                { wch: 25 }, // Y: Критическая ошибка
+                { wch: 30 }, // Z: Общий комментарий
+                { wch: 15 }  // AA: Дата создания
+            ];
+            ws['!cols'] = colWidths;
+
+            // Добавляем автофильтр для заголовков
+            ws['!autofilter'] = { ref: "A1:AA1" };
+
+            // Добавляем worksheet в workbook
+            XLSX.utils.book_append_sheet(wb, ws, 'Оценки звонков');
+
+            // Генерируем и скачиваем файл
+            const dateStr = new Date().toISOString().split('T')[0];
+            const filename = `Оценки_звонков_${dateStr}.xlsx`;
+            
+            XLSX.writeFile(wb, filename);
+            
+            this.showMessage('✅ Отчет успешно выгружен в формате Excel (XLSX)', 'success');
+            
+        } catch (error) {
+            console.error('Ошибка при экспорте в Excel:', error);
+            this.showMessage('❌ Ошибка при экспорте в Excel', 'error');
+        }
     }
 
     // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
@@ -975,22 +1181,34 @@ class CallEvaluationSystem {
             return sum + value;
         }, 0);
 
-        document.getElementById('totalScoreDisplay').textContent = total;
+        const display = document.getElementById('totalScoreDisplay');
+        if (display) {
+            display.textContent = total;
+        }
     }
 
     setDefaultDates() {
         const today = new Date().toISOString().split('T')[0];
-        document.getElementById('evaluationDate').value = today;
-        document.getElementById('callDate').value = today;
+        const evaluationDate = document.getElementById('evaluationDate');
+        const callDate = document.getElementById('callDate');
+        
+        if (evaluationDate) evaluationDate.value = today;
+        if (callDate) callDate.value = today;
     }
 
     formatDate(dateString) {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('ru-RU');
+        try {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('ru-RU');
+        } catch (error) {
+            return dateString;
+        }
     }
 
     showMessage(message, type = 'info') {
         const messageDiv = document.getElementById('auth-message');
+        if (!messageDiv) return;
+        
         messageDiv.textContent = message;
         messageDiv.className = `auth-message ${type}`;
         
@@ -1024,8 +1242,11 @@ class CallEvaluationSystem {
             content.classList.remove('active');
         });
 
-        document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-        document.getElementById(tabName).classList.add('active');
+        const tabButton = document.querySelector(`[data-tab="${tabName}"]`);
+        const tabContent = document.getElementById(tabName);
+        
+        if (tabButton) tabButton.classList.add('active');
+        if (tabContent) tabContent.classList.add('active');
 
         if (tabName === 'view') {
             this.loadEvaluations();
@@ -1037,32 +1258,42 @@ class CallEvaluationSystem {
     // ==================== ИНИЦИАЛИЗАЦИЯ СОБЫТИЙ ====================
     initializeEventListeners() {
         // Авторизация
-        document.getElementById('login-btn').addEventListener('click', (e) => {
-            e.preventDefault();
-            const password = document.getElementById('password').value;
-            
-            if (!password) {
-                this.showMessage('❌ Введите пароль', 'error');
-                return;
-            }
+        const loginBtn = document.getElementById('login-btn');
+        const passwordInput = document.getElementById('password');
+        const logoutBtn = document.getElementById('logout-btn');
 
-            if (this.login(password)) {
-                this.showMessage('✅ Вход успешен!', 'success');
-            } else {
-                this.showMessage('❌ Неверный пароль', 'error');
-            }
-        });
+        if (loginBtn) {
+            loginBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                const password = passwordInput ? passwordInput.value : '';
+                
+                if (!password) {
+                    this.showMessage('❌ Введите пароль', 'error');
+                    return;
+                }
 
-        document.getElementById('password').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                document.getElementById('login-btn').click();
-            }
-        });
+                if (this.login(password)) {
+                    this.showMessage('✅ Вход успешен!', 'success');
+                } else {
+                    this.showMessage('❌ Неверный пароль', 'error');
+                }
+            });
+        }
 
-        document.getElementById('logout-btn').addEventListener('click', () => {
-            this.logout();
-            this.showMessage('✅ Выход выполнен', 'success');
-        });
+        if (passwordInput) {
+            passwordInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    if (loginBtn) loginBtn.click();
+                }
+            });
+        }
+
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                this.logout();
+                this.showMessage('✅ Выход выполнен', 'success');
+            });
+        }
 
         // Форма оценки
         const evaluationForm = document.getElementById('evaluationForm');
@@ -1070,8 +1301,6 @@ class CallEvaluationSystem {
             evaluationForm.addEventListener('submit', (e) => {
                 this.saveEvaluation(e);
             });
-        } else {
-            console.error('Форма оценки не найдена!');
         }
 
         // Обновление итогового балла
@@ -1080,24 +1309,34 @@ class CallEvaluationSystem {
         });
 
         // ==================== ФИЛЬТРЫ ПРОСМОТРА ====================
-        document.getElementById('applyFilters').addEventListener('click', () => {
-            console.log('Применение фильтров...');
-            this.applyFilters();
-        });
+        const applyFiltersBtn = document.getElementById('applyFilters');
+        const clearFiltersBtn = document.getElementById('clearFilters');
+        const searchInput = document.getElementById('searchInput');
+        const exportBtn = document.getElementById('exportBtn');
 
-        document.getElementById('clearFilters').addEventListener('click', () => {
-            console.log('Сброс фильтров...');
-            this.selectedManagers = [];
-            this.setupManagerFilters();
-            document.getElementById('viewStartDate').value = '';
-            document.getElementById('viewEndDate').value = '';
-            document.getElementById('searchInput').value = '';
-            this.applyFilters();
-            this.showMessage('✅ Фильтры сброшены', 'success');
-        });
+        if (applyFiltersBtn) {
+            applyFiltersBtn.addEventListener('click', () => {
+                this.applyFilters();
+            });
+        }
+
+        if (clearFiltersBtn) {
+            clearFiltersBtn.addEventListener('click', () => {
+                this.selectedManagers = [];
+                this.setupManagerFilters();
+                const viewStartDate = document.getElementById('viewStartDate');
+                const viewEndDate = document.getElementById('viewEndDate');
+                
+                if (viewStartDate) viewStartDate.value = '';
+                if (viewEndDate) viewEndDate.value = '';
+                if (searchInput) searchInput.value = '';
+                
+                this.applyFilters();
+                this.showMessage('✅ Фильтры сброшены', 'success');
+            });
+        }
 
         // Поиск с задержкой
-        const searchInput = document.getElementById('searchInput');
         if (searchInput) {
             let searchTimeout;
             searchInput.addEventListener('input', (e) => {
@@ -1108,24 +1347,37 @@ class CallEvaluationSystem {
             });
         }
 
-        // Экспорт
-        document.getElementById('exportBtn').addEventListener('click', () => {
-            this.exportToCSV();
-        });
+        // Экспорт в Excel
+        if (exportBtn) {
+            exportBtn.addEventListener('click', () => {
+                this.exportToExcel();
+            });
+        }
 
         // ==================== СТАТИСТИКА ====================
-        document.getElementById('calculateStats').addEventListener('click', () => {
-            this.calculateStatistics();
-        });
+        const calculateStatsBtn = document.getElementById('calculateStats');
+        const clearStatsFiltersBtn = document.getElementById('clearStatsFilters');
 
-        document.getElementById('clearStatsFilters').addEventListener('click', () => {
-            this.statsSelectedManagers = [];
-            this.setupManagerFilters();
-            document.getElementById('statsStartDate').value = '';
-            document.getElementById('statsEndDate').value = '';
-            this.calculateStatistics();
-            this.showMessage('✅ Фильтры статистики сброшены', 'success');
-        });
+        if (calculateStatsBtn) {
+            calculateStatsBtn.addEventListener('click', () => {
+                this.calculateStatistics();
+            });
+        }
+
+        if (clearStatsFiltersBtn) {
+            clearStatsFiltersBtn.addEventListener('click', () => {
+                this.statsSelectedManagers = [];
+                this.setupManagerFilters();
+                const statsStartDate = document.getElementById('statsStartDate');
+                const statsEndDate = document.getElementById('statsEndDate');
+                
+                if (statsStartDate) statsStartDate.value = '';
+                if (statsEndDate) statsEndDate.value = '';
+                
+                this.calculateStatistics();
+                this.showMessage('✅ Фильтры статистики сброшены', 'success');
+            });
+        }
 
         // Переключение табов
         document.querySelectorAll('.tab-button').forEach(button => {
