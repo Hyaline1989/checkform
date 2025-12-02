@@ -878,7 +878,7 @@ class CallEvaluationSystem {
                 </div>
             </div>
             <div class="additional-stats-section">
-                <h3>🕒 Статистика по поиску работы на later время</h3>
+                <h3>🕒 Статистика по поиску работы на более позднее время</h3>
                 <div class="additional-stats-grid">
                     <div class="additional-stat-card">
                         <div class="additional-stat-label">Искали работу позже</div>
