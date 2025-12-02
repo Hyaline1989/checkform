@@ -90,6 +90,23 @@ body {
     font-weight: 500;
 }
 
+/* ===== СТИЛИ ДЛЯ ЧЕКБОКСА "ОК" ===== */
+.error-checkbox input[type="checkbox"]:checked + label[for$="Ok"] {
+    color: #4CAF50 !important;
+    font-weight: 700 !important;
+}
+
+/* Стили для отключенных чекбоксов */
+.errors-checkbox-group input[type="checkbox"]:disabled + label {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.errors-checkbox-group input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 /* ===== MAIN APP ===== */
 #app-content {
     background: white;
@@ -324,6 +341,12 @@ header h1 {
 .error-checkbox input[type="checkbox"]:checked {
     background: #4db6ac;
     border-color: #4db6ac;
+}
+
+.error-checkbox input[type="checkbox"]:checked + label[for$="Ok"] {
+    background: #e8f5f4;
+    padding: 2px 8px;
+    border-radius: 4px;
 }
 
 .error-checkbox label {
@@ -1029,4 +1052,61 @@ header h1 {
     .tab-content {
         display: block !important;
     }
+}
+
+/* Добавить в конец файла, после всех остальных стилей */
+
+/* ===== СТИЛИ ДЛЯ ВАЛИДАЦИИ ===== */
+.validation-error {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1) !important;
+}
+
+.validation-error:focus {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.25) !important;
+}
+
+.error-message {
+    color: #dc3545 !important;
+    font-size: 14px !important;
+    margin-top: 5px !important;
+    padding: 5px 10px !important;
+    background-color: #f8d7da !important;
+    border-radius: 4px !important;
+    border: 1px solid #f5c6cb !important;
+    animation: fadeIn 0.3s ease-out !important;
+}
+
+/* Подсветка критериев с ошибками */
+.criterion.validation-error {
+    border-color: #dc3545 !important;
+    background-color: #fff5f5 !important;
+}
+
+.criterion.validation-error h3 {
+    color: #dc3545 !important;
+}
+
+/* Анимация появления ошибок */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Подсветка обязательных полей */
+.form-group.required label::after {
+    content: " *";
+    color: #dc3545;
+}
+
+/* Анимация прокрутки к ошибке */
+html {
+    scroll-behavior: smooth;
 }

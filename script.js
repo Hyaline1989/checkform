@@ -42,6 +42,146 @@ class CallEvaluationSystem {
         this.populateManagersList();
         this.setupManagerFilters();
         this.setupDurationInput();
+        this.setupOkCheckboxes();
+    }
+
+    // ==================== ЛОГИКА ЧЕКБОКСОВ "ОК" ====================
+    setupOkCheckboxes() {
+        const criteria = ['contact', 'presentation', 'objections', 'closing', 'tov'];
+        
+        criteria.forEach(criterion => {
+            const okCheckbox = document.getElementById(`${criterion}Ok`);
+            if (!okCheckbox) return;
+            
+            const errorCheckboxes = document.querySelectorAll(`input[id^="${criterion}Error"]`);
+            
+            okCheckbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    errorCheckboxes.forEach(cb => {
+                        cb.checked = false;
+                        cb.disabled = true;
+                    });
+                } else {
+                    errorCheckboxes.forEach(cb => {
+                        cb.disabled = false;
+                    });
+                }
+            });
+            
+            errorCheckboxes.forEach(cb => {
+                cb.addEventListener('change', (e) => {
+                    if (e.target.checked) {
+                        okCheckbox.checked = false;
+                        errorCheckboxes.forEach(errorCb => {
+                            errorCb.disabled = false;
+                        });
+                    }
+                });
+            });
+        });
+    }
+
+    // ==================== ВАЛИДАЦИЯ ЧЕКБОКСОВ ====================
+    validateCheckboxes() {
+        const criteria = [
+            { key: 'contact', name: 'Установление контакта' },
+            { key: 'presentation', name: 'Презентация/Предложение' },
+            { key: 'objections', name: 'Отработка возражений' },
+            { key: 'closing', name: 'Завершение' },
+            { key: 'tov', name: 'TOV' }
+        ];
+        
+        const missingCriteria = [];
+        
+        for (const criterion of criteria) {
+            const okCheckbox = document.getElementById(`${criterion.key}Ok`);
+            const errorCheckboxes = document.querySelectorAll(`input[id^="${criterion.key}Error"]:checked`);
+            
+            const hasOk = okCheckbox && okCheckbox.checked;
+            const hasErrors = errorCheckboxes.length > 0;
+            
+            if (!hasOk && !hasErrors) {
+                // Находим родительский контейнер критерия
+                const criterionElement = okCheckbox ? okCheckbox.closest('.criterion') : null;
+                missingCriteria.push({
+                    name: criterion.name,
+                    element: criterionElement
+                });
+            }
+        }
+        
+        return missingCriteria;
+    }
+
+    // ==================== ОЧИСТКА ВАЛИДАЦИОННЫХ ОШИБОК ====================
+    clearValidationErrors() {
+        // Убираем красные рамки
+        document.querySelectorAll('.validation-error').forEach(element => {
+            element.classList.remove('validation-error');
+        });
+        
+        // Убираем сообщения об ошибках
+        document.querySelectorAll('.error-message').forEach(element => {
+            element.remove();
+        });
+    }
+
+    // ==================== ПОКАЗАТЬ ОШИБКУ ВАЛИДАЦИИ ====================
+    showValidationError(element, message) {
+        if (!element) return;
+        
+        // Добавляем красную рамку
+        element.classList.add('validation-error');
+        
+        // Если это контейнер критерия, находим заголовок для сообщения
+        let targetElement = element;
+        if (element.classList.contains('criterion')) {
+            // Находим заголовок внутри критерия
+            const header = element.querySelector('h3');
+            if (header) {
+                targetElement = header;
+            }
+        }
+        
+        // Удаляем старое сообщение об ошибке
+        const existingError = targetElement.nextElementSibling?.classList.contains('error-message') 
+            ? targetElement.nextElementSibling 
+            : null;
+        if (existingError) {
+            existingError.remove();
+        }
+        
+        // Создаем новое сообщение об ошибке
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.style.color = '#dc3545';
+        errorDiv.style.fontSize = '14px';
+        errorDiv.style.marginTop = '5px';
+        errorDiv.style.padding = '5px 10px';
+        errorDiv.style.backgroundColor = '#f8d7da';
+        errorDiv.style.borderRadius = '4px';
+        errorDiv.style.border = '1px solid #f5c6cb';
+        errorDiv.textContent = message;
+        
+        // Добавляем сообщение после элемента
+        if (targetElement.nextSibling) {
+            targetElement.parentNode.insertBefore(errorDiv, targetElement.nextSibling);
+        } else {
+            targetElement.parentNode.appendChild(errorDiv);
+        }
+        
+        // Прокручиваем к ошибке
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        
+        // Фокусируемся на первом чекбоксе в критерии
+        if (element.classList.contains('criterion')) {
+            const firstCheckbox = element.querySelector('input[type="checkbox"]');
+            if (firstCheckbox) {
+                firstCheckbox.focus();
+            }
+        } else {
+            element.focus();
+        }
     }
 
     // ==================== ИНИЦИАЛИЗАЦИЯ SUPABASE ====================
@@ -60,7 +200,7 @@ class CallEvaluationSystem {
         }
     }
 
-    // ==================== ЛОКАЛЬНОЕ ХРАНИЛИЩЕ (РЕЗЕРВНЫЙ ВАРИАНТ) ====================
+    // ==================== ЛОКАЛЬНОЕ ХРАНИЛИЩЕ ====================
     getLocalEvaluations() {
         try {
             const stored = localStorage.getItem('callEvaluations');
@@ -74,7 +214,7 @@ class CallEvaluationSystem {
     saveLocalEvaluation(evaluationData) {
         try {
             const evaluations = this.getLocalEvaluations();
-            evaluationData.id = Date.now(); // Добавляем ID
+            evaluationData.id = Date.now();
             evaluationData.created_at = new Date().toISOString();
             evaluations.unshift(evaluationData);
             localStorage.setItem('callEvaluations', JSON.stringify(evaluations));
@@ -91,16 +231,10 @@ class CallEvaluationSystem {
         if (durationInput) {
             durationInput.addEventListener('input', (e) => {
                 let value = e.target.value.replace(/\D/g, '');
-                if (value.length > 6) {
-                    value = value.substring(0, 6);
-                }
+                if (value.length > 6) value = value.substring(0, 6);
                 
-                if (value.length >= 2) {
-                    value = value.substring(0, 2) + ':' + value.substring(2);
-                }
-                if (value.length >= 5) {
-                    value = value.substring(0, 5) + ':' + value.substring(5);
-                }
+                if (value.length >= 2) value = value.substring(0, 2) + ':' + value.substring(2);
+                if (value.length >= 5) value = value.substring(0, 5) + ':' + value.substring(5);
                 
                 e.target.value = value;
             });
@@ -138,9 +272,7 @@ class CallEvaluationSystem {
                     selectedArray.push(manager);
                 } else {
                     const index = selectedArray.indexOf(manager);
-                    if (index > -1) {
-                        selectedArray.splice(index, 1);
-                    }
+                    if (index > -1) selectedArray.splice(index, 1);
                 }
             });
             
@@ -165,7 +297,7 @@ class CallEvaluationSystem {
         });
     }
 
-    // ==================== ПРОСТАЯ АУТЕНТИФИКАЦИЯ ====================
+    // ==================== АУТЕНТИФИКАЦИЯ ====================
     checkAuthentication() {
         const savedAuth = localStorage.getItem('callSystemAuth');
         if (savedAuth === ACCESS_PASSWORD) {
@@ -212,33 +344,67 @@ class CallEvaluationSystem {
         
         this.loadEvaluations();
         this.updateTotalScore();
+        this.setDefaultDates();
     }
 
-    // ==================== ОЦЕНКИ ЗВОНКОВ ====================
+    // ==================== СОХРАНЕНИЕ ОЦЕНКИ ====================
     async saveEvaluation(e) {
         e.preventDefault();
-        console.log('Сохранение оценки...');
         
         if (!this.isAuthenticated) {
             this.showMessage('❌ Доступ запрещен', 'error');
             return;
         }
 
+        // Очищаем предыдущие ошибки
+        this.clearValidationErrors();
+
         // Проверка обязательных полей
         const requiredFields = [
-            'evaluationDate', 'managerName', 'callDate', 'callDuration',
-            'isTarget', 'laterWork', 'contactScore', 'presentationScore',
-            'objectionsScore', 'closingScore'
+            { id: 'evaluationDate', name: 'Дата проверки' },
+            { id: 'managerName', name: 'ФИО МП' },
+            { id: 'callDate', name: 'Дата звонка' },
+            { id: 'callDuration', name: 'Длительность звонка' },
+            { id: 'isTarget', name: 'Целевой' },
+            { id: 'laterWork', name: 'Искал работу на более позднее время' },
+            { id: 'contactScore', name: 'Баллы за контакт' },
+            { id: 'presentationScore', name: 'Баллы за презентацию' },
+            { id: 'objectionsScore', name: 'Баллы за возражения' },
+            { id: 'closingScore', name: 'Баллы за завершение' }
         ];
 
-        for (const fieldId of requiredFields) {
-            const field = document.getElementById(fieldId);
-            if (!field || !field.value) {
-                const fieldName = field?.previousElementSibling?.textContent || fieldId;
-                this.showMessage(`❌ Заполните обязательное поле: ${fieldName}`, 'error');
-                field?.focus();
-                return;
+        let hasError = false;
+        let firstErrorElement = null;
+
+        // Проверяем обязательные поля
+        for (const field of requiredFields) {
+            const element = document.getElementById(field.id);
+            if (!element || !element.value.trim()) {
+                this.showValidationError(element, `❌ Заполните поле: ${field.name}`);
+                hasError = true;
+                if (!firstErrorElement) firstErrorElement = element;
             }
+        }
+
+        // Проверяем чекбоксы
+        const missingCriteria = this.validateCheckboxes();
+        if (missingCriteria.length > 0) {
+            missingCriteria.forEach(item => {
+                if (item.element) {
+                    this.showValidationError(item.element, `❌ Выберите "Ок" или ошибки для: ${item.name}`);
+                    hasError = true;
+                    if (!firstErrorElement) firstErrorElement = item.element;
+                }
+            });
+        }
+
+        // Если есть ошибки - не продолжаем
+        if (hasError) {
+            // Прокручиваем к первой ошибке
+            if (firstErrorElement) {
+                firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            return;
         }
 
         // Валидация баллов
@@ -250,31 +416,36 @@ class CallEvaluationSystem {
             tov: parseInt(document.getElementById('tovScore').value)
         };
 
-        // Обновленная валидация баллов
-        if (scores.contact < 0 || scores.contact > 30) {
-            this.showMessage('❌ Баллы за контакт должны быть от 0 до 30', 'error');
-            return;
+        const scoreValidations = [
+            { id: 'contactScore', value: scores.contact, min: 0, max: 30, name: 'контакт' },
+            { id: 'presentationScore', value: scores.presentation, min: 0, max: 30, name: 'презентацию' },
+            { id: 'objectionsScore', value: scores.objections, min: 0, max: 30, name: 'возражения' },
+            { id: 'closingScore', value: scores.closing, min: 0, max: 10, name: 'завершение' }
+        ];
+
+        for (const validation of scoreValidations) {
+            if (validation.value < validation.min || validation.value > validation.max) {
+                const element = document.getElementById(validation.id);
+                this.showValidationError(element, `❌ Баллы за ${validation.name} должны быть от ${validation.min} до ${validation.max}`);
+                hasError = true;
+                if (!firstErrorElement) firstErrorElement = element;
+            }
         }
-        if (scores.presentation < 0 || scores.presentation > 30) {
-            this.showMessage('❌ Баллы за презентацию должны быть от 0 до 30', 'error');
-            return;
-        }
-        if (scores.objections < 0 || scores.objections > 30) {
-            this.showMessage('❌ Баллы за возражения должны быть от 0 до 30', 'error');
-            return;
-        }
-        if (scores.closing < 0 || scores.closing > 10) {
-            this.showMessage('❌ Баллы за завершение должны быть от 0 до 10', 'error');
+
+        if (hasError) {
+            if (firstErrorElement) {
+                firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
             return;
         }
 
         try {
-            // Собираем выбранные ошибки
-            const contactErrors = this.getSelectedErrors('contactError');
-            const presentationErrors = this.getSelectedErrors('presentationError');
-            const objectionsErrors = this.getSelectedErrors('objectionsError');
-            const closingErrors = this.getSelectedErrors('closingError');
-            const tovErrors = this.getSelectedErrors('tovError');
+            // Собираем данные
+            const contactErrors = this.getSelectedErrors('contact');
+            const presentationErrors = this.getSelectedErrors('presentation');
+            const objectionsErrors = this.getSelectedErrors('objections');
+            const closingErrors = this.getSelectedErrors('closing');
+            const tovErrors = this.getSelectedErrors('tov');
 
             const evaluationData = {
                 evaluation_date: document.getElementById('evaluationDate').value,
@@ -311,49 +482,33 @@ class CallEvaluationSystem {
                 total_score: parseInt(document.getElementById('totalScoreDisplay').textContent)
             };
 
-            console.log('Данные для сохранения:', evaluationData);
-
             let savedData;
             
-            // Пытаемся сохранить в Supabase
             if (this.supabase) {
                 const { data, error } = await this.supabase
                     .from('evaluations')
                     .insert([evaluationData])
                     .select();
 
-                if (error) {
-                    console.error('Ошибка Supabase:', error);
-                    throw new Error(`Supabase: ${error.message}`);
-                }
+                if (error) throw error;
                 savedData = data[0];
-                console.log('Успешно сохранено в Supabase:', savedData);
             } else {
-                // Сохраняем локально
                 savedData = this.saveLocalEvaluation(evaluationData);
-                console.log('Успешно сохранено локально:', savedData);
             }
 
             this.showMessage('✅ Оценка успешно сохранена!', 'success');
             
-            // Сброс формы
             document.getElementById('evaluationForm').reset();
             this.setDefaultDates();
             this.updateTotalScore();
             this.clearAllErrorCheckboxes();
+            this.clearValidationErrors();
             
-            // Перезагрузка списка оценок
             await this.loadEvaluations();
             
         } catch (error) {
             console.error('Ошибка при сохранении:', error);
-            let errorMessage = '❌ Ошибка при сохранении';
-            
-            if (error.message) {
-                errorMessage += ': ' + error.message;
-            }
-            
-            this.showMessage(errorMessage, 'error');
+            this.showMessage(`❌ Ошибка при сохранении: ${error.message}`, 'error');
         }
     }
 
@@ -366,6 +521,7 @@ class CallEvaluationSystem {
         const allCheckboxes = document.querySelectorAll('.errors-checkbox-group input[type="checkbox"]');
         allCheckboxes.forEach(checkbox => {
             checkbox.checked = false;
+            checkbox.disabled = false;
         });
     }
 
@@ -373,32 +529,19 @@ class CallEvaluationSystem {
         try {
             let evaluationsData = [];
 
-            // Пытаемся загрузить из Supabase
             if (this.supabase) {
                 let query = this.supabase
                     .from('evaluations')
                     .select('*')
                     .order('created_at', { ascending: false });
 
-                if (searchTerm) {
-                    query = query.ilike('manager_name', `%${searchTerm}%`);
-                }
+                if (searchTerm) query = query.ilike('manager_name', `%${searchTerm}%`);
 
                 const { data, error } = await query;
-
-                if (error) {
-                    console.error('Ошибка Supabase при загрузке:', error);
-                    throw new Error(`Supabase: ${error.message}`);
-                }
-
+                if (error) throw error;
                 evaluationsData = data || [];
-                console.log('Данные загружены из Supabase:', evaluationsData.length);
             } else {
-                // Загружаем локальные данные
                 evaluationsData = this.getLocalEvaluations();
-                console.log('Данные загружены локально:', evaluationsData.length);
-                
-                // Фильтрация по поиску для локальных данных
                 if (searchTerm) {
                     evaluationsData = evaluationsData.filter(item => 
                         item.manager_name.toLowerCase().includes(searchTerm.toLowerCase().trim())
@@ -412,8 +555,6 @@ class CallEvaluationSystem {
             
         } catch (error) {
             console.error('Ошибка загрузки данных:', error);
-            
-            // Показываем демо-данные при ошибке
             this.evaluations = this.getLocalEvaluations();
             this.filteredEvaluations = [...this.evaluations];
             this.applyFilters();
@@ -428,7 +569,6 @@ class CallEvaluationSystem {
     applyFilters() {
         let filtered = [...this.evaluations];
         
-        // Фильтр по дате
         const startDate = document.getElementById('viewStartDate')?.value;
         const endDate = document.getElementById('viewEndDate')?.value;
         
@@ -447,14 +587,10 @@ class CallEvaluationSystem {
             });
         }
         
-        // Фильтр по менеджерам
         if (this.selectedManagers.length > 0) {
-            filtered = filtered.filter(item => {
-                return this.selectedManagers.includes(item.manager_name);
-            });
+            filtered = filtered.filter(item => this.selectedManagers.includes(item.manager_name));
         }
         
-        // Поиск
         const searchTerm = document.getElementById('searchInput')?.value;
         if (searchTerm && searchTerm.trim() !== '') {
             filtered = filtered.filter(item => 
@@ -472,18 +608,15 @@ class CallEvaluationSystem {
         try {
             let success = false;
             
-            // Пытаемся удалить из Supabase
             if (this.supabase) {
                 const { error } = await this.supabase
                     .from('evaluations')
                     .delete()
                     .eq('id', id);
-
                 if (error) throw error;
                 success = true;
             }
             
-            // Удаляем локально в любом случае
             const evaluations = this.getLocalEvaluations();
             const updatedEvaluations = evaluations.filter(item => item.id !== id);
             localStorage.setItem('callEvaluations', JSON.stringify(updatedEvaluations));
@@ -534,7 +667,6 @@ class CallEvaluationSystem {
                 <div class="expand-icon">▼</div>
                 
                 <div class="evaluation-content">
-                    <!-- Детализация баллов -->
                     <div class="score-breakdown">
                         <div class="score-item">
                             <span class="score-category">🤝 Установление контакта:</span>
@@ -560,7 +692,6 @@ class CallEvaluationSystem {
                     
                     ${this.renderErrors(evalItem)}
                     
-                    <!-- Развернутые комментарии к параметрам -->
                     <div class="detailed-comments">
                         ${evalItem.contact_comment ? `
                             <div class="parameter-comment">
@@ -611,18 +742,41 @@ class CallEvaluationSystem {
         `).join('');
     }
 
-    toggleEvaluation(element) {
-        element.classList.toggle('expanded');
-    }
-
     renderErrors(evalItem) {
         const errors = [];
-        if (evalItem.contact_errors) errors.push(`<strong>Контакт:</strong> ${evalItem.contact_errors}`);
-        if (evalItem.presentation_errors) errors.push(`<strong>Презентация:</strong> ${evalItem.presentation_errors}`);
-        if (evalItem.objections_errors) errors.push(`<strong>Возражения:</strong> ${evalItem.objections_errors}`);
-        if (evalItem.closing_errors) errors.push(`<strong>Завершение:</strong> ${evalItem.closing_errors}`);
-        if (evalItem.tov_errors) errors.push(`<strong>TOV:</strong> ${evalItem.tov_errors}`);
-        if (evalItem.critical_error) errors.push(`<strong>Критическая:</strong> ${evalItem.critical_error}`);
+        
+        const formatErrors = (errorsText, category) => {
+            if (!errorsText) return null;
+            if (errorsText.includes('Ок')) {
+                return `<strong>${category}:</strong> ✅ Ок`;
+            } else {
+                return `<strong>${category}:</strong> ${errorsText}`;
+            }
+        };
+        
+        if (evalItem.contact_errors) {
+            const formatted = formatErrors(evalItem.contact_errors, 'Контакт');
+            if (formatted) errors.push(formatted);
+        }
+        if (evalItem.presentation_errors) {
+            const formatted = formatErrors(evalItem.presentation_errors, 'Презентация');
+            if (formatted) errors.push(formatted);
+        }
+        if (evalItem.objections_errors) {
+            const formatted = formatErrors(evalItem.objections_errors, 'Возражения');
+            if (formatted) errors.push(formatted);
+        }
+        if (evalItem.closing_errors) {
+            const formatted = formatErrors(evalItem.closing_errors, 'Завершение');
+            if (formatted) errors.push(formatted);
+        }
+        if (evalItem.tov_errors) {
+            const formatted = formatErrors(evalItem.tov_errors, 'TOV');
+            if (formatted) errors.push(formatted);
+        }
+        if (evalItem.critical_error) {
+            errors.push(`<strong>Критическая:</strong> ${evalItem.critical_error}`);
+        }
         
         if (errors.length > 0) {
             return `
@@ -635,6 +789,10 @@ class CallEvaluationSystem {
         return '';
     }
 
+    toggleEvaluation(element) {
+        element.classList.toggle('expanded');
+    }
+
     // ==================== СТАТИСТИКА ====================
     async calculateStatistics() {
         const startDate = document.getElementById('statsStartDate')?.value;
@@ -643,25 +801,16 @@ class CallEvaluationSystem {
         try {
             let evaluationsData = [];
 
-            // Пытаемся загрузить из Supabase
             if (this.supabase) {
-                let query = this.supabase
-                    .from('evaluations')
-                    .select('*');
-
+                let query = this.supabase.from('evaluations').select('*');
                 if (startDate && endDate) {
                     query = query.gte('call_date', startDate).lte('call_date', endDate);
                 }
-
                 const { data, error } = await query;
-
                 if (error) throw error;
                 evaluationsData = data || [];
             } else {
-                // Используем локальные данные
                 evaluationsData = this.getLocalEvaluations();
-                
-                // Фильтрация по дате для локальных данных
                 if (startDate && endDate) {
                     evaluationsData = evaluationsData.filter(item => {
                         const itemDate = new Date(item.call_date);
@@ -672,7 +821,6 @@ class CallEvaluationSystem {
                 }
             }
             
-            // Фильтр по менеджерам для статистики
             if (this.statsSelectedManagers.length > 0) {
                 evaluationsData = evaluationsData.filter(item => 
                     this.statsSelectedManagers.includes(item.manager_name)
@@ -685,7 +833,6 @@ class CallEvaluationSystem {
             
         } catch (error) {
             console.error('Ошибка загрузки статистики:', error);
-            // Используем локальные данные при ошибке
             const evaluationsData = this.getLocalEvaluations();
             this.displayStatistics(evaluationsData);
             this.displayAdditionalStats(evaluationsData);
@@ -715,7 +862,6 @@ class CallEvaluationSystem {
         const avgObjections = evaluationsData.reduce((sum, item) => sum + item.objections_score, 0) / totalCalls;
         const avgClosing = evaluationsData.reduce((sum, item) => sum + item.closing_score, 0) / totalCalls;
 
-        // Базовая статистика
         let baseStatsHTML = `
             <div class="stat-card">
                 <div class="stat-label">📞 Всего оценок</div>
@@ -749,7 +895,6 @@ class CallEvaluationSystem {
             </div>
         `;
 
-        // Если выбраны конкретные менеджеры, показываем детальную статистику по каждому
         let managersStatsHTML = '';
         if (this.statsSelectedManagers.length > 0) {
             managersStatsHTML = this.displayManagersDetailedStats(evaluationsData);
@@ -759,7 +904,6 @@ class CallEvaluationSystem {
     }
 
     displayManagersDetailedStats(evaluationsData) {
-        // Группируем данные по менеджерам
         const managersData = {};
         
         evaluationsData.forEach(item => {
@@ -847,13 +991,11 @@ class CallEvaluationSystem {
             return;
         }
 
-        // Статистика по "Целевой"
         const targetStats = {
             да: evaluationsData.filter(item => item.is_target === 'да').length,
             нет: evaluationsData.filter(item => item.is_target === 'нет').length
         };
 
-        // Статистика по "Искал работу на более позднее время"
         const laterWorkStats = {
             да: evaluationsData.filter(item => item.later_work === 'да').length,
             нет: evaluationsData.filter(item => item.later_work === 'нет').length
@@ -904,50 +1046,54 @@ class CallEvaluationSystem {
             return;
         }
 
-        // Собираем статистику по ошибкам
         const errorsStats = {
             contact: {},
             presentation: {},
             objections: {},
             closing: {},
             tov: {},
-            critical: 0 // Счетчик для критических ошибок
+            critical: 0
         };
 
         const totalCalls = evaluationsData.length;
 
         evaluationsData.forEach(item => {
-            // Ошибки контакта
             if (item.contact_errors) {
                 item.contact_errors.split('; ').forEach(error => {
-                    errorsStats.contact[error] = (errorsStats.contact[error] || 0) + 1;
+                    // Исключаем "Ок" из статистики ошибок
+                    if (error !== 'Ок') {
+                        errorsStats.contact[error] = (errorsStats.contact[error] || 0) + 1;
+                    }
                 });
             }
-            // Ошибки презентации
             if (item.presentation_errors) {
                 item.presentation_errors.split('; ').forEach(error => {
-                    errorsStats.presentation[error] = (errorsStats.presentation[error] || 0) + 1;
+                    if (error !== 'Ок') {
+                        errorsStats.presentation[error] = (errorsStats.presentation[error] || 0) + 1;
+                    }
                 });
             }
-            // Ошибки возражений
             if (item.objections_errors) {
                 item.objections_errors.split('; ').forEach(error => {
-                    errorsStats.objections[error] = (errorsStats.objections[error] || 0) + 1;
+                    if (error !== 'Ок') {
+                        errorsStats.objections[error] = (errorsStats.objections[error] || 0) + 1;
+                    }
                 });
             }
-            // Ошибки завершения
             if (item.closing_errors) {
                 item.closing_errors.split('; ').forEach(error => {
-                    errorsStats.closing[error] = (errorsStats.closing[error] || 0) + 1;
+                    if (error !== 'Ок') {
+                        errorsStats.closing[error] = (errorsStats.closing[error] || 0) + 1;
+                    }
                 });
             }
-            // Ошибки TOV
             if (item.tov_errors) {
                 item.tov_errors.split('; ').forEach(error => {
-                    errorsStats.tov[error] = (errorsStats.tov[error] || 0) + 1;
+                    if (error !== 'Ок') {
+                        errorsStats.tov[error] = (errorsStats.tov[error] || 0) + 1;
+                    }
                 });
             }
-            // Критические ошибки - просто счетчик заполненных полей
             if (item.critical_error && item.critical_error.trim() !== '') {
                 errorsStats.critical++;
             }
@@ -955,7 +1101,6 @@ class CallEvaluationSystem {
 
         let errorsHTML = '';
 
-        // Функция для отображения ошибок по категории
         const renderErrorsSection = (category, title) => {
             const errors = errorsStats[category];
             
@@ -985,7 +1130,6 @@ class CallEvaluationSystem {
             return sectionHTML;
         };
 
-        // Отдельно для критических ошибок (просто счетчик)
         if (errorsStats.critical > 0) {
             const criticalPercentage = ((errorsStats.critical / totalCalls) * 100).toFixed(1);
             errorsHTML += `
@@ -1011,7 +1155,7 @@ class CallEvaluationSystem {
         container.innerHTML = errorsHTML || '<p>Нет данных по ошибкам для выбранного периода</p>';
     }
 
-    // ==================== ЭКСПОРТ В XLSX (НАСТОЯЩИЙ EXCEL) ====================
+    // ==================== ЭКСПОРТ В XLSX ====================
     async exportToExcel() {
         const evaluationsToExport = this.filteredEvaluations.length > 0 ? this.filteredEvaluations : this.evaluations;
         
@@ -1020,133 +1164,50 @@ class CallEvaluationSystem {
             return;
         }
 
-        // Структура отчета для Excel
         const headers = [
-            'ФИО МП',
-            'Дата проверки',
-            'Дата звонка', 
-            'Длительность звонка',
-            'Целевой',
-            'Искал работу на более позднее время',
-            'Номер телефона',
-            'Ссылка на лид',
-            'Общий балл',
-            // Установление контакта
-            'Установление контакта - Баллы',
-            'Установление контакта - Ошибки',
-            'Установление контакта - Комментарий',
-            // Презентация
-            'Презентация - Баллы',
-            'Презентация - Ошибки', 
-            'Презентация - Комментарий',
-            // Отработка возражений
-            'Отработка возражений - Баллы',
-            'Отработка возражений - Ошибки',
-            'Отработка возражений - Комментарий',
-            // Завершение
-            'Завершение - Баллы',
-            'Завершение - Ошибки',
-            'Завершение - Комментарий',
-            // TOV
-            'TOV - Баллы',
-            'TOV - Ошибки',
-            'TOV - Комментарий',
-            // Дополнительно
-            'Критическая ошибка',
-            'Общий комментарий',
-            'Дата создания записи'
+            'ФИО МП', 'Дата проверки', 'Дата звонка', 'Длительность звонка',
+            'Целевой', 'Искал работу на более позднее время', 'Номер телефона',
+            'Ссылка на лид', 'Общий балл', 'Установление контакта - Баллы',
+            'Установление контакта - Ошибки', 'Установление контакта - Комментарий',
+            'Презентация - Баллы', 'Презентация - Ошибки', 'Презентация - Комментарий',
+            'Отработка возражений - Баллы', 'Отработка возражений - Ошибки',
+            'Отработка возражений - Комментарий', 'Завершение - Баллы',
+            'Завершение - Ошибки', 'Завершение - Комментарий', 'TOV - Баллы',
+            'TOV - Ошибки', 'TOV - Комментарий', 'Критическая ошибка',
+            'Общий комментарий', 'Дата создания записи'
         ];
 
-        // Подготовка данных
         const data = evaluationsToExport.map(item => [
-            // Столбец A: ФИО менеджера
-            item.manager_name,
-            // Основная информация (B-H)
-            item.evaluation_date,
-            item.call_date,
-            item.call_duration,
-            item.is_target,
-            item.later_work,
-            item.phone_number || '',
-            item.lead_link || '',
-            // Общий балл (I)
-            item.total_score,
-            // Установление контакта (J-L)
-            item.contact_score,
-            item.contact_errors || '',
-            item.contact_comment || '',
-            // Презентация (M-O)
-            item.presentation_score,
-            item.presentation_errors || '',
-            item.presentation_comment || '',
-            // Отработка возражений (P-R)
-            item.objections_score,
-            item.objections_errors || '',
-            item.objections_comment || '',
-            // Завершение (S-U)
-            item.closing_score,
-            item.closing_errors || '',
-            item.closing_comment || '',
-            // TOV (V-X)
-            item.tov_score,
-            item.tov_errors || '',
-            item.tov_comment || '',
-            // Дополнительно (Y-Z+)
-            item.critical_error || '',
-            item.overall_comment || '',
+            item.manager_name, item.evaluation_date, item.call_date,
+            item.call_duration, item.is_target, item.later_work,
+            item.phone_number || '', item.lead_link || '', item.total_score,
+            item.contact_score, item.contact_errors || '', item.contact_comment || '',
+            item.presentation_score, item.presentation_errors || '', item.presentation_comment || '',
+            item.objections_score, item.objections_errors || '', item.objections_comment || '',
+            item.closing_score, item.closing_errors || '', item.closing_comment || '',
+            item.tov_score, item.tov_errors || '', item.tov_comment || '',
+            item.critical_error || '', item.overall_comment || '',
             new Date(item.created_at).toLocaleDateString('ru-RU')
         ]);
 
         try {
-            // Создаем workbook и worksheet
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
 
-            // Настраиваем ширину колонок для лучшего отображения
             const colWidths = [
-                { wch: 25 }, // A: ФИО МП
-                { wch: 12 }, // B: Дата проверки
-                { wch: 12 }, // C: Дата звонка
-                { wch: 15 }, // D: Длительность
-                { wch: 10 }, // E: Целевой
-                { wch: 12 }, // F: Искал работу позже
-                { wch: 15 }, // G: Телефон
-                { wch: 20 }, // H: Ссылка
-                { wch: 12 }, // I: Общий балл
-                // Установление контакта
-                { wch: 10 }, // J: Баллы
-                { wch: 30 }, // K: Ошибки
-                { wch: 30 }, // L: Комментарий
-                // Презентация
-                { wch: 10 }, // M: Баллы
-                { wch: 30 }, // N: Ошибки
-                { wch: 30 }, // O: Комментарий
-                // Отработка возражений
-                { wch: 10 }, // P: Баллы
-                { wch: 30 }, // Q: Ошибки
-                { wch: 30 }, // R: Комментарий
-                // Завершение
-                { wch: 10 }, // S: Баллы
-                { wch: 30 }, // T: Ошибки
-                { wch: 30 }, // U: Комментарий
-                // TOV
-                { wch: 10 }, // V: Баллы
-                { wch: 30 }, // W: Ошибки
-                { wch: 30 }, // X: Комментарий
-                // Дополнительно
-                { wch: 25 }, // Y: Критическая ошибка
-                { wch: 30 }, // Z: Общий комментарий
-                { wch: 15 }  // AA: Дата создания
-            ];
+                { wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 10 },
+                { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 10 },
+                { wch: 30 }, { wch: 30 }, { wch: 10 }, { wch: 30 }, { wch: 30 },
+                { wch: 10 }, { wch: 30 }, { wch: 30 }, { wch: 10 }, { wch: 30 },
+                { wch: 30 }, { wch: 10 }, { wch: 30 }, { wch: 30 }, { wch: 25 },
+                { wch: 30 }, { wch: 15 }
+        ];
             ws['!cols'] = colWidths;
 
-            // Добавляем автофильтр для заголовков
             ws['!autofilter'] = { ref: "A1:AA1" };
 
-            // Добавляем worksheet в workbook
             XLSX.utils.book_append_sheet(wb, ws, 'Оценки звонков');
 
-            // Генерируем и скачиваем файл
             const dateStr = new Date().toISOString().split('T')[0];
             const filename = `Оценки_звонков_${dateStr}.xlsx`;
             
@@ -1302,7 +1363,7 @@ class CallEvaluationSystem {
             input.addEventListener('input', () => this.updateTotalScore());
         });
 
-        // ==================== ФИЛЬТРЫ ПРОСМОТРА ====================
+        // ФИЛЬТРЫ ПРОСМОТРА
         const applyFiltersBtn = document.getElementById('applyFilters');
         const clearFiltersBtn = document.getElementById('clearFilters');
         const searchInput = document.getElementById('searchInput');
@@ -1330,7 +1391,6 @@ class CallEvaluationSystem {
             });
         }
 
-        // Поиск с задержкой
         if (searchInput) {
             let searchTimeout;
             searchInput.addEventListener('input', (e) => {
@@ -1341,14 +1401,13 @@ class CallEvaluationSystem {
             });
         }
 
-        // Экспорт в Excel
         if (exportBtn) {
             exportBtn.addEventListener('click', () => {
                 this.exportToExcel();
             });
         }
 
-        // ==================== СТАТИСТИКА ====================
+        // СТАТИСТИКА
         const calculateStatsBtn = document.getElementById('calculateStats');
         const clearStatsFiltersBtn = document.getElementById('clearStatsFilters');
 
