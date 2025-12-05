@@ -91,6 +91,16 @@
                                 </select>
                             </div>
                         </div>
+                        <!-- Добавлен блок "Хороший звонок" -->
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="isGoodCall">🌟 Хороший звонок:</label>
+                                <select id="isGoodCall" required>
+                                    <option value="нет">Нет</option>
+                                    <option value="да">Да</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Критерии оценки -->
@@ -242,7 +252,7 @@
                                         <label for="objectionsError3">Не отработал возражения</label>
                                     </div>
                                     <div class="error-checkbox">
-                                        <input type="checkbox" id="objectionsError4" value="Не презентовал после замены">
+                                        <input type="checkbox" id="objectionsError4" value="Не презентовал после замену">
                                         <label for="objectionsError4">Не презентовал после замены</label>
                                     </div>
                                     <div class="error-checkbox">
@@ -305,10 +315,6 @@
                             <div class="comment-group">
                                 <label>Короткие ошибки:</label>
                                 <div class="errors-checkbox-group">
-                                    <!-- <div class="error-checkbox">
-                                        <input type="checkbox" id="tovOk" value="Ок">
-                                        <label for="tovOk" style="color: #4CAF50; font-weight: bold;">✅ Ок</label>
-                                    </div> -->
                                     <div class="error-checkbox">
                                         <input type="checkbox" id="tovError1" value="Игнорирование эмоций">
                                         <label for="tovError1">Игнорирование эмоций</label>
@@ -424,6 +430,24 @@
                             <label>Выберите МП:</label>
                             <div id="managerFilter" class="manager-filter">
                                 <!-- Чекбоксы менеджеров будут заполнены через JavaScript -->
+                            </div>
+                        </div>
+                        <!-- Добавлен фильтр по качеству звонка -->
+                        <div class="form-group">
+                            <label>Фильтр по качеству звонка:</label>
+                            <div class="quality-filter">
+                                <div class="quality-checkbox">
+                                    <input type="radio" id="quality-all" name="qualityFilter" value="all" checked>
+                                    <label for="quality-all">Все звонки</label>
+                                </div>
+                                <div class="quality-checkbox">
+                                    <input type="radio" id="quality-good" name="qualityFilter" value="да">
+                                    <label for="quality-good">🌟 Только хорошие</label>
+                                </div>
+                                <div class="quality-checkbox">
+                                    <input type="radio" id="quality-not-good" name="qualityFilter" value="нет">
+                                    <label for="quality-not-good">Обычные звонки</label>
+                                </div>
                             </div>
                         </div>
                         <div class="filter-actions">

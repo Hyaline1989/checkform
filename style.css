@@ -1152,3 +1152,143 @@ html {
         display: block !important;
     }
 }
+
+/* ===== СТИЛИ ДЛЯ ФИЛЬТРОВ КАЧЕСТВА ===== */
+.quality-filter {
+    display: flex;
+    gap: 20px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+}
+
+.quality-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 15px;
+    background: white;
+    border: 2px solid #e0f2f1;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.quality-checkbox:hover {
+    border-color: #4db6ac;
+    background: #f8fdfc;
+}
+
+.quality-checkbox input[type="radio"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+}
+
+.quality-checkbox label {
+    cursor: pointer;
+    font-weight: 500;
+    color: #2c3e50;
+    margin: 0;
+}
+
+.quality-checkbox input[type="radio"]:checked + label {
+    color: #26a69a;
+    font-weight: 600;
+}
+
+/* Специальный стиль для "Хороший звонок" */
+.quality-checkbox input[value="да"]:checked + label {
+    color: #ff9800;
+    font-weight: 700;
+}
+
+/* ===== СТИЛЬ ДЛЯ МЕТКИ ХОРОШЕГО ЗВОНКА В СПИСКЕ ===== */
+.evaluation-good-call {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: linear-gradient(135deg, #ffb74d, #ff9800);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 15px;
+    font-weight: 600;
+    font-size: 13px;
+    margin-left: 10px;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* ===== ОБНОВЛЯЕМ СТИЛЬ HEADER ОЦЕНКИ ===== */
+.evaluation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    flex-wrap: wrap;
+    gap: 10px;
+    position: relative;
+}
+
+.evaluation-manager {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    color: #2c3e50;
+    font-size: 1.2em;
+    flex-wrap: wrap;
+}
+
+/* Адаптивность для мобильных */
+@media (max-width: 768px) {
+    .quality-filter {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .evaluation-manager {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .evaluation-good-call {
+        margin-left: 0;
+        margin-top: 5px;
+    }
+}
+
+/* ===== ДОПОЛНИТЕЛЬНЫЕ СТИЛИ ДЛЯ СТАТИСТИКИ ХОРОШИХ ЗВОНКОВ ===== */
+.stat-good-calls {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 5px 15px rgba(255, 152, 0, 0.1);
+    border: 2px solid #ffb74d;
+    transition: all 0.3s ease;
+}
+
+.stat-good-calls .stat-value {
+    color: #ff9800;
+}
+
+.stat-good-calls:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(255, 152, 0, 0.15);
+}
+
+/* Анимация для хороших звонков в статистике */
+@keyframes glow {
+    0% { box-shadow: 0 0 5px rgba(255, 152, 0, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(255, 152, 0, 0.8); }
+    100% { box-shadow: 0 0 5px rgba(255, 152, 0, 0.5); }
+}
+
+.stat-good-calls {
+    animation: glow 3s infinite;
+}

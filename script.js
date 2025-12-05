@@ -32,6 +32,7 @@ class CallEvaluationSystem {
         this.filteredEvaluations = [];
         this.selectedManagers = [];
         this.statsSelectedManagers = [];
+        this.qualityFilter = 'all'; // all, да, нет
         this.supabase = null;
         
         this.initializeSupabase();
@@ -365,6 +366,7 @@ class CallEvaluationSystem {
             { id: 'callDuration', name: 'Длительность звонка' },
             { id: 'isTarget', name: 'Целевой' },
             { id: 'laterWork', name: 'Искал работу на более позднее время' },
+            { id: 'isGoodCall', name: 'Хороший звонок' },
             { id: 'contactScore', name: 'Баллы за контакт' },
             { id: 'presentationScore', name: 'Баллы за презентацию' },
             { id: 'objectionsScore', name: 'Баллы за возражения' },
@@ -454,6 +456,7 @@ class CallEvaluationSystem {
                 call_duration: document.getElementById('callDuration').value,
                 is_target: document.getElementById('isTarget').value,
                 later_work: document.getElementById('laterWork').value,
+                is_good_call: document.getElementById('isGoodCall').value,
                 
                 contact_score: scores.contact,
                 contact_errors: contactErrors.length > 0 ? contactErrors.join('; ') : null,
@@ -523,6 +526,7 @@ class CallEvaluationSystem {
         });
     }
 
+    // ==================== ЗАГРУЗКА ОЦЕНОК ====================
     async loadEvaluations(searchTerm = '') {
         try {
             let evaluationsData = [];
@@ -589,6 +593,11 @@ class CallEvaluationSystem {
             filtered = filtered.filter(item => this.selectedManagers.includes(item.manager_name));
         }
         
+        // Фильтр по качеству звонка
+        if (this.qualityFilter !== 'all') {
+            filtered = filtered.filter(item => item.is_good_call === this.qualityFilter);
+        }
+        
         const searchTerm = document.getElementById('searchInput')?.value;
         if (searchTerm && searchTerm.trim() !== '') {
             filtered = filtered.filter(item => 
@@ -600,6 +609,7 @@ class CallEvaluationSystem {
         this.displayEvaluations();
     }
 
+    // ==================== УДАЛЕНИЕ ОЦЕНКИ ====================
     async deleteEvaluation(id) {
         if (!confirm('Вы уверены, что хотите удалить эту оценку?')) return;
 
@@ -631,6 +641,7 @@ class CallEvaluationSystem {
         }
     }
 
+    // ==================== ОТОБРАЖЕНИЕ ОЦЕНОК ====================
     displayEvaluations() {
         const container = document.getElementById('evaluationsList');
         if (!container) return;
@@ -650,7 +661,12 @@ class CallEvaluationSystem {
         container.innerHTML = evaluationsToShow.map(evalItem => `
             <div class="evaluation-item" onclick="callSystem.toggleEvaluation(this)">
                 <div class="evaluation-header">
-                    <div class="evaluation-manager">👤 ${evalItem.manager_name}</div>
+                    <div class="evaluation-manager">
+                        👤 ${evalItem.manager_name}
+                        ${evalItem.is_good_call === 'да' ? 
+                            '<span class="evaluation-good-call">🌟 Хороший звонок</span>' : 
+                            ''}
+                    </div>
                     <div class="evaluation-score">${evalItem.total_score}/100</div>
                 </div>
                 <div class="evaluation-details">
@@ -658,6 +674,7 @@ class CallEvaluationSystem {
                     <div>⏱️ Длительность: ${evalItem.call_duration}</div>
                     <div>🎯 Целевой: ${evalItem.is_target}</div>
                     <div>🕒 Искал работу позже: ${evalItem.later_work}</div>
+                    <div>🌟 Хороший звонок: ${evalItem.is_good_call === 'да' ? 'Да' : 'Нет'}</div>
                     <div>📊 Дата оценки: ${this.formatDate(evalItem.created_at)}</div>
                     ${evalItem.phone_number ? `<div>📞 Телефон: ${evalItem.phone_number}</div>` : ''}
                     ${evalItem.lead_link ? `<div>🔗 Ссылка: <a href="${evalItem.lead_link}" target="_blank">${evalItem.lead_link}</a></div>` : ''}
@@ -791,6 +808,12 @@ class CallEvaluationSystem {
         element.classList.toggle('expanded');
     }
 
+    // ==================== ОБНОВЛЕНИЕ ФИЛЬТРА КАЧЕСТВА ====================
+    updateQualityFilter(value) {
+        this.qualityFilter = value;
+        this.applyFilters();
+    }
+
     // ==================== СТАТИСТИКА ====================
     async calculateStatistics() {
         const startDate = document.getElementById('statsStartDate')?.value;
@@ -859,6 +882,10 @@ class CallEvaluationSystem {
         const avgPresentation = evaluationsData.reduce((sum, item) => sum + item.presentation_score, 0) / totalCalls;
         const avgObjections = evaluationsData.reduce((sum, item) => sum + item.objections_score, 0) / totalCalls;
         const avgClosing = evaluationsData.reduce((sum, item) => sum + item.closing_score, 0) / totalCalls;
+        
+        // Статистика хороших звонков
+        const goodCalls = evaluationsData.filter(item => item.is_good_call === 'да').length;
+        const goodCallsPercentage = totalCalls > 0 ? ((goodCalls / totalCalls) * 100).toFixed(1) : 0;
 
         let baseStatsHTML = `
             <div class="stat-card">
@@ -870,6 +897,11 @@ class CallEvaluationSystem {
                 <div class="stat-label">📊 Средний балл</div>
                 <div class="stat-value">${averageScore.toFixed(1)}</div>
                 <div>из 100</div>
+            </div>
+            <div class="stat-card stat-good-calls">
+                <div class="stat-label">🌟 Хороших звонков</div>
+                <div class="stat-value">${goodCalls}</div>
+                <div>${goodCallsPercentage}%</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">🤝 Контакт</div>
@@ -913,7 +945,8 @@ class CallEvaluationSystem {
                     presentationScore: 0,
                     objectionsScore: 0,
                     closingScore: 0,
-                    tovScore: 0
+                    tovScore: 0,
+                    goodCalls: 0
                 };
             }
             
@@ -924,6 +957,9 @@ class CallEvaluationSystem {
             managersData[item.manager_name].objectionsScore += item.objections_score;
             managersData[item.manager_name].closingScore += item.closing_score;
             managersData[item.manager_name].tovScore += item.tov_score;
+            if (item.is_good_call === 'да') {
+                managersData[item.manager_name].goodCalls++;
+            }
         });
 
         let managersHTML = '<div class="managers-detailed-stats">';
@@ -936,6 +972,7 @@ class CallEvaluationSystem {
             const avgObjections = (data.objectionsScore / evalCount).toFixed(1);
             const avgClosing = (data.closingScore / evalCount).toFixed(1);
             const avgTov = (data.tovScore / evalCount).toFixed(1);
+            const goodCallsPercentage = evalCount > 0 ? ((data.goodCalls / evalCount) * 100).toFixed(1) : 0;
 
             managersHTML += `
                 <div class="manager-stat-section">
@@ -967,9 +1004,9 @@ class CallEvaluationSystem {
                             <div class="manager-stat-max">/10</div>
                         </div>
                         <div class="manager-stat-card">
-                            <div class="manager-stat-label">⚡ TOV</div>
-                            <div class="manager-stat-value">${avgTov}</div>
-                            <div class="manager-stat-max">баллов</div>
+                            <div class="manager-stat-label">🌟 Хороших звонков</div>
+                            <div class="manager-stat-value">${data.goodCalls}</div>
+                            <div class="manager-stat-max">${goodCallsPercentage}%</div>
                         </div>
                     </div>
                 </div>
@@ -989,6 +1026,8 @@ class CallEvaluationSystem {
             return;
         }
 
+        const totalCalls = evaluationsData.length;
+        
         const targetStats = {
             да: evaluationsData.filter(item => item.is_target === 'да').length,
             нет: evaluationsData.filter(item => item.is_target === 'нет').length
@@ -999,7 +1038,10 @@ class CallEvaluationSystem {
             нет: evaluationsData.filter(item => item.later_work === 'нет').length
         };
 
-        const totalCalls = evaluationsData.length;
+        const goodCallStats = {
+            да: evaluationsData.filter(item => item.is_good_call === 'да').length,
+            нет: evaluationsData.filter(item => item.is_good_call === 'нет').length
+        };
 
         container.innerHTML = `
             <div class="additional-stats-section">
@@ -1008,12 +1050,12 @@ class CallEvaluationSystem {
                     <div class="additional-stat-card">
                         <div class="additional-stat-label">Целевые звонки</div>
                         <div class="additional-stat-value">${targetStats.да}</div>
-                        <div>${((targetStats.да / totalCalls) * 100).toFixed(1)}%</div>
+                        <div>${totalCalls > 0 ? ((targetStats.да / totalCalls) * 100).toFixed(1) : 0}%</div>
                     </div>
                     <div class="additional-stat-card">
                         <div class="additional-stat-label">Нецелевые звонки</div>
                         <div class="additional-stat-value">${targetStats.нет}</div>
-                        <div>${((targetStats.нет / totalCalls) * 100).toFixed(1)}%</div>
+                        <div>${totalCalls > 0 ? ((targetStats.нет / totalCalls) * 100).toFixed(1) : 0}%</div>
                     </div>
                 </div>
             </div>
@@ -1023,12 +1065,27 @@ class CallEvaluationSystem {
                     <div class="additional-stat-card">
                         <div class="additional-stat-label">Искали работу позже</div>
                         <div class="additional-stat-value">${laterWorkStats.да}</div>
-                        <div>${((laterWorkStats.да / totalCalls) * 100).toFixed(1)}%</div>
+                        <div>${totalCalls > 0 ? ((laterWorkStats.да / totalCalls) * 100).toFixed(1) : 0}%</div>
                     </div>
                     <div class="additional-stat-card">
                         <div class="additional-stat-label">Не искали работу позже</div>
                         <div class="additional-stat-value">${laterWorkStats.нет}</div>
-                        <div>${((laterWorkStats.нет / totalCalls) * 100).toFixed(1)}%</div>
+                        <div>${totalCalls > 0 ? ((laterWorkStats.нет / totalCalls) * 100).toFixed(1) : 0}%</div>
+                    </div>
+                </div>
+            </div>
+            <div class="additional-stats-section">
+                <h3>🌟 Статистика по хорошим звонкам</h3>
+                <div class="additional-stats-grid">
+                    <div class="additional-stat-card" style="border-left: 4px solid #ff9800;">
+                        <div class="additional-stat-label">Хорошие звонки</div>
+                        <div class="additional-stat-value" style="color: #ff9800;">${goodCallStats.да}</div>
+                        <div>${totalCalls > 0 ? ((goodCallStats.да / totalCalls) * 100).toFixed(1) : 0}%</div>
+                    </div>
+                    <div class="additional-stat-card">
+                        <div class="additional-stat-label">Обычные звонки</div>
+                        <div class="additional-stat-value">${goodCallStats.нет}</div>
+                        <div>${totalCalls > 0 ? ((goodCallStats.нет / totalCalls) * 100).toFixed(1) : 0}%</div>
                     </div>
                 </div>
             </div>
@@ -1112,7 +1169,7 @@ class CallEvaluationSystem {
             Object.entries(errors)
                 .sort(([,a], [,b]) => b - a)
                 .forEach(([error, count]) => {
-                    const percentage = ((count / totalCalls) * 100).toFixed(1);
+                    const percentage = totalCalls > 0 ? ((count / totalCalls) * 100).toFixed(1) : 0;
                     sectionHTML += `
                         <div class="error-item">
                             <span class="error-name">${error}</span>
@@ -1129,7 +1186,7 @@ class CallEvaluationSystem {
         };
 
         if (errorsStats.critical > 0) {
-            const criticalPercentage = ((errorsStats.critical / totalCalls) * 100).toFixed(1);
+            const criticalPercentage = totalCalls > 0 ? ((errorsStats.critical / totalCalls) * 100).toFixed(1) : 0;
             errorsHTML += `
                 <div class="errors-section">
                     <h3>🚨 Критические ошибки</h3>
@@ -1164,8 +1221,8 @@ class CallEvaluationSystem {
 
         const headers = [
             'ФИО МП', 'Дата проверки', 'Дата звонка', 'Длительность звонка',
-            'Целевой', 'Искал работу на более позднее время', 'Номер телефона',
-            'Ссылка на лид', 'Общий балл', 'Установление контакта - Баллы',
+            'Целевой', 'Искал работу на более позднее время', 'Хороший звонок',
+            'Номер телефона', 'Ссылка на лид', 'Общий балл', 'Установление контакта - Баллы',
             'Установление контакта - Ошибки', 'Установление контакта - Комментарий',
             'Презентация - Баллы', 'Презентация - Ошибки', 'Презентация - Комментарий',
             'Отработка возражений - Баллы', 'Отработка возражений - Ошибки',
@@ -1178,6 +1235,7 @@ class CallEvaluationSystem {
         const data = evaluationsToExport.map(item => [
             item.manager_name, item.evaluation_date, item.call_date,
             item.call_duration, item.is_target, item.later_work,
+            item.is_good_call === 'да' ? 'Да' : 'Нет',
             item.phone_number || '', item.lead_link || '', item.total_score,
             item.contact_score, item.contact_errors || '', item.contact_comment || '',
             item.presentation_score, item.presentation_errors || '', item.presentation_comment || '',
@@ -1194,12 +1252,12 @@ class CallEvaluationSystem {
 
             const colWidths = [
                 { wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 10 },
-                { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 10 },
-                { wch: 30 }, { wch: 30 }, { wch: 10 }, { wch: 30 }, { wch: 30 },
+                { wch: 12 }, { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 12 },
                 { wch: 10 }, { wch: 30 }, { wch: 30 }, { wch: 10 }, { wch: 30 },
-                { wch: 30 }, { wch: 10 }, { wch: 30 }, { wch: 30 }, { wch: 25 },
-                { wch: 30 }, { wch: 15 }
-        ];
+                { wch: 30 }, { wch: 10 }, { wch: 30 }, { wch: 30 }, { wch: 10 },
+                { wch: 30 }, { wch: 30 }, { wch: 10 }, { wch: 30 }, { wch: 30 },
+                { wch: 25 }, { wch: 30 }, { wch: 15 }
+            ];
             ws['!cols'] = colWidths;
 
             ws['!autofilter'] = { ref: "A1:AA1" };
@@ -1376,6 +1434,7 @@ class CallEvaluationSystem {
         if (clearFiltersBtn) {
             clearFiltersBtn.addEventListener('click', () => {
                 this.selectedManagers = [];
+                this.qualityFilter = 'all';
                 this.setupManagerFilters();
                 const viewStartDate = document.getElementById('viewStartDate');
                 const viewEndDate = document.getElementById('viewEndDate');
@@ -1383,6 +1442,9 @@ class CallEvaluationSystem {
                 if (viewStartDate) viewStartDate.value = '';
                 if (viewEndDate) viewEndDate.value = '';
                 if (searchInput) searchInput.value = '';
+                
+                // Сброс радио-кнопок качества
+                document.getElementById('quality-all').checked = true;
                 
                 this.applyFilters();
                 this.showMessage('✅ Фильтры сброшены', 'success');
@@ -1398,6 +1460,13 @@ class CallEvaluationSystem {
                 }, 300);
             });
         }
+
+        // Обработчики для фильтра качества
+        document.querySelectorAll('input[name="qualityFilter"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                this.updateQualityFilter(e.target.value);
+            });
+        });
 
         if (exportBtn) {
             exportBtn.addEventListener('click', () => {
