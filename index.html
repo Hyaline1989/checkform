@@ -462,7 +462,36 @@
                     <button id="exportBtn" class="action-btn">📊 Экспорт в Excel</button>
                 </div>
                 
+                <!-- Информация о странице -->
+                <div id="paginationInfo" class="pagination-info">
+                    Показано <span id="currentRange">0-0</span> из <span id="totalEvaluations">0</span> оценок
+                </div>
+                
                 <div id="evaluationsList" class="evaluations-list"></div>
+                
+                <!-- Контейнер пагинации -->
+                <div id="paginationContainer" class="pagination-container">
+                    <div class="pagination-controls">
+                        <button id="firstPage" class="pagination-btn" disabled>⏮️ Первая</button>
+                        <button id="prevPage" class="pagination-btn" disabled>◀️ Назад</button>
+                        
+                        <div id="pageNumbers" class="page-numbers"></div>
+                        
+                        <button id="nextPage" class="pagination-btn" disabled>Вперед ▶️</button>
+                        <button id="lastPage" class="pagination-btn" disabled>Последняя ⏭️</button>
+                    </div>
+                    
+                    <div class="page-size-selector">
+                        <label for="pageSize">Показывать по:</label>
+                        <select id="pageSize">
+                            <option value="10">10</option>
+                            <option value="20" selected>20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="0">Все</option>
+                        </select>
+                    </div>
+                </div>
             </div>
 
             <!-- Вкладка статистики -->

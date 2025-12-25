@@ -32,8 +32,14 @@ class CallEvaluationSystem {
         this.filteredEvaluations = [];
         this.selectedManagers = [];
         this.statsSelectedManagers = [];
-        this.qualityFilter = 'all'; // all, да, нет
+        this.qualityFilter = 'all';
         this.supabase = null;
+        
+        // Пагинация
+        this.currentPage = 1;
+        this.pageSize = 20; // По умолчанию 20 элементов на странице
+        this.totalPages = 1;
+        this.displayedEvaluations = [];
         
         this.initializeSupabase();
         this.checkAuthentication();
@@ -42,6 +48,180 @@ class CallEvaluationSystem {
         this.setupManagerFilters();
         this.setupDurationInput();
         this.setupOkCheckboxes();
+        this.initializePaginationListeners();
+    }
+
+    // ==================== ИНИЦИАЛИЗАЦИЯ ПАГИНАЦИИ ====================
+    initializePaginationListeners() {
+        // Обработчики для кнопок пагинации
+        document.getElementById('firstPage')?.addEventListener('click', () => this.goToPage(1));
+        document.getElementById('prevPage')?.addEventListener('click', () => this.goToPage(this.currentPage - 1));
+        document.getElementById('nextPage')?.addEventListener('click', () => this.goToPage(this.currentPage + 1));
+        document.getElementById('lastPage')?.addEventListener('click', () => this.goToPage(this.totalPages));
+        
+        // Обработчик изменения размера страницы
+        document.getElementById('pageSize')?.addEventListener('change', (e) => {
+            this.pageSize = parseInt(e.target.value);
+            this.currentPage = 1; // Сброс на первую страницу при изменении размера
+            this.applyFilters();
+        });
+    }
+
+    // ==================== ПАГИНАЦИЯ ДАННЫХ ====================
+    getPaginatedData() {
+        const totalItems = this.filteredEvaluations.length;
+        
+        // Если выбрано "Все" или нет данных
+        if (this.pageSize === 0 || totalItems === 0) {
+            this.displayedEvaluations = this.filteredEvaluations;
+            this.totalPages = 1;
+            this.currentPage = 1;
+            return;
+        }
+        
+        // Рассчитываем общее количество страниц
+        this.totalPages = Math.ceil(totalItems / this.pageSize);
+        
+        // Корректируем текущую страницу, если она вышла за пределы
+        if (this.currentPage > this.totalPages) {
+            this.currentPage = this.totalPages;
+        }
+        if (this.currentPage < 1) {
+            this.currentPage = 1;
+        }
+        
+        // Получаем данные для текущей страницы
+        const startIndex = (this.currentPage - 1) * this.pageSize;
+        const endIndex = Math.min(startIndex + this.pageSize, totalItems);
+        
+        this.displayedEvaluations = this.filteredEvaluations.slice(startIndex, endIndex);
+    }
+
+    // ==================== ПЕРЕХОД НА СТРАНИЦУ ====================
+    goToPage(page) {
+        if (page < 1 || page > this.totalPages || page === this.currentPage) return;
+        
+        this.currentPage = page;
+        this.displayEvaluations();
+        this.updatePaginationControls();
+        this.scrollToTop();
+    }
+
+    // ==================== ОБНОВЛЕНИЕ ЭЛЕМЕНТОВ ПАГИНАЦИИ ====================
+    updatePaginationControls() {
+        const totalItems = this.filteredEvaluations.length;
+        const startIndex = totalItems === 0 ? 0 : (this.currentPage - 1) * this.pageSize + 1;
+        let endIndex;
+        
+        if (this.pageSize === 0 || totalItems === 0) {
+            endIndex = totalItems;
+        } else {
+            endIndex = Math.min(this.currentPage * this.pageSize, totalItems);
+        }
+        
+        // Обновляем информацию о странице
+        const currentRangeEl = document.getElementById('currentRange');
+        const totalEvaluationsEl = document.getElementById('totalEvaluations');
+        
+        if (currentRangeEl) currentRangeEl.textContent = `${startIndex}-${endIndex}`;
+        if (totalEvaluationsEl) totalEvaluationsEl.textContent = totalItems;
+        
+        // Обновляем состояние кнопок навигации
+        const firstPageBtn = document.getElementById('firstPage');
+        const prevPageBtn = document.getElementById('prevPage');
+        const nextPageBtn = document.getElementById('nextPage');
+        const lastPageBtn = document.getElementById('lastPage');
+        
+        if (firstPageBtn) firstPageBtn.disabled = this.currentPage === 1 || totalItems === 0;
+        if (prevPageBtn) prevPageBtn.disabled = this.currentPage === 1 || totalItems === 0;
+        if (nextPageBtn) nextPageBtn.disabled = this.currentPage === this.totalPages || totalItems === 0;
+        if (lastPageBtn) lastPageBtn.disabled = this.currentPage === this.totalPages || totalItems === 0;
+        
+        // Обновляем номера страниц
+        this.renderPageNumbers();
+    }
+
+    // ==================== РЕНДЕРИНГ НОМЕРОВ СТРАНИЦ ====================
+    renderPageNumbers() {
+        const pageNumbersContainer = document.getElementById('pageNumbers');
+        if (!pageNumbersContainer) return;
+        
+        pageNumbersContainer.innerHTML = '';
+        
+        const totalItems = this.filteredEvaluations.length;
+        if (totalItems === 0 || this.totalPages <= 1) return;
+        
+        const maxVisiblePages = 7; // Максимальное количество видимых номеров страниц
+        let startPage, endPage;
+        
+        if (this.totalPages <= maxVisiblePages) {
+            // Показываем все страницы
+            startPage = 1;
+            endPage = this.totalPages;
+        } else {
+            // Рассчитываем диапазон страниц с текущей страницей в центре
+            const maxPagesBeforeCurrent = Math.floor(maxVisiblePages / 2);
+            const maxPagesAfterCurrent = Math.ceil(maxVisiblePages / 2) - 1;
+            
+            if (this.currentPage <= maxPagesBeforeCurrent) {
+                // Текущая страница в начале
+                startPage = 1;
+                endPage = maxVisiblePages;
+            } else if (this.currentPage + maxPagesAfterCurrent >= this.totalPages) {
+                // Текущая страница в конце
+                startPage = this.totalPages - maxVisiblePages + 1;
+                endPage = this.totalPages;
+            } else {
+                // Текущая страница в середине
+                startPage = this.currentPage - maxPagesBeforeCurrent;
+                endPage = this.currentPage + maxPagesAfterCurrent;
+            }
+        }
+        
+        // Создаем кнопки для диапазона страниц
+        for (let i = startPage; i <= endPage; i++) {
+            const pageBtn = document.createElement('button');
+            pageBtn.className = `page-btn ${i === this.currentPage ? 'active' : ''}`;
+            pageBtn.textContent = i;
+            pageBtn.addEventListener('click', () => this.goToPage(i));
+            pageNumbersContainer.appendChild(pageBtn);
+        }
+        
+        // Добавляем многоточие в начале, если нужно
+        if (startPage > 1) {
+            const ellipsisStart = document.createElement('span');
+            ellipsisStart.className = 'page-btn ellipsis';
+            ellipsisStart.textContent = '...';
+            pageNumbersContainer.insertBefore(ellipsisStart, pageNumbersContainer.firstChild);
+            
+            const firstPageBtn = document.createElement('button');
+            firstPageBtn.className = 'page-btn';
+            firstPageBtn.textContent = '1';
+            firstPageBtn.addEventListener('click', () => this.goToPage(1));
+            pageNumbersContainer.insertBefore(firstPageBtn, pageNumbersContainer.firstChild);
+        }
+        
+        // Добавляем многоточие в конце, если нужно
+        if (endPage < this.totalPages) {
+            const ellipsisEnd = document.createElement('span');
+            ellipsisEnd.className = 'page-btn ellipsis';
+            ellipsisEnd.textContent = '...';
+            pageNumbersContainer.appendChild(ellipsisEnd);
+            
+            const lastPageBtn = document.createElement('button');
+            lastPageBtn.className = 'page-btn';
+            lastPageBtn.textContent = this.totalPages;
+            lastPageBtn.addEventListener('click', () => this.goToPage(this.totalPages));
+            pageNumbersContainer.appendChild(lastPageBtn);
+        }
+    }
+
+    // ==================== ПРОКРУТКА К ВЕРХУ ====================
+    scrollToTop() {
+        const evaluationsList = document.getElementById('evaluationsList');
+        if (evaluationsList) {
+            evaluationsList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     }
 
     // ==================== ЛОГИКА ЧЕКБОКСОВ "ОК" ====================
@@ -526,7 +706,7 @@ class CallEvaluationSystem {
         });
     }
 
-    // ==================== ЗАГРУЗКА ОЦЕНОК ====================
+    // ==================== ОБНОВЛЕННЫЙ МЕТОД ЗАГРУЗКИ ОЦЕНОК ====================
     async loadEvaluations(searchTerm = '') {
         try {
             let evaluationsData = [];
@@ -553,13 +733,19 @@ class CallEvaluationSystem {
 
             this.evaluations = evaluationsData;
             this.filteredEvaluations = [...this.evaluations];
-            this.applyFilters();
+            this.currentPage = 1; // Сброс на первую страницу
+            this.getPaginatedData();
+            this.displayEvaluations();
+            this.updatePaginationControls();
             
         } catch (error) {
             console.error('Ошибка загрузки данных:', error);
             this.evaluations = this.getLocalEvaluations();
             this.filteredEvaluations = [...this.evaluations];
-            this.applyFilters();
+            this.currentPage = 1;
+            this.getPaginatedData();
+            this.displayEvaluations();
+            this.updatePaginationControls();
             
             if (this.evaluations.length === 0) {
                 this.showMessage('⚠️ Используется локальное хранилище. Данные будут сохранены только в этом браузере.', 'info');
@@ -567,7 +753,7 @@ class CallEvaluationSystem {
         }
     }
 
-    // ==================== ФИЛЬТРАЦИЯ И ПРОСМОТР ====================
+    // ==================== ОБНОВЛЕННЫЙ МЕТОД ФИЛЬТРАЦИИ ====================
     applyFilters() {
         let filtered = [...this.evaluations];
         
@@ -606,7 +792,12 @@ class CallEvaluationSystem {
         }
         
         this.filteredEvaluations = filtered;
+        
+        // Сбрасываем на первую страницу при применении фильтров
+        this.currentPage = 1;
+        this.getPaginatedData();
         this.displayEvaluations();
+        this.updatePaginationControls();
     }
 
     // ==================== УДАЛЕНИЕ ОЦЕНКИ ====================
@@ -641,12 +832,12 @@ class CallEvaluationSystem {
         }
     }
 
-    // ==================== ОТОБРАЖЕНИЕ ОЦЕНОК ====================
+    // ==================== ОБНОВЛЕННЫЙ МЕТОД ОТОБРАЖЕНИЯ ОЦЕНОК ====================
     displayEvaluations() {
         const container = document.getElementById('evaluationsList');
         if (!container) return;
         
-        const evaluationsToShow = this.filteredEvaluations;
+        const evaluationsToShow = this.displayedEvaluations;
         
         if (!evaluationsToShow || evaluationsToShow.length === 0) {
             container.innerHTML = `
@@ -1366,7 +1557,7 @@ class CallEvaluationSystem {
         }
     }
 
-    // ==================== ИНИЦИАЛИЗАЦИЯ СОБЫТИЙ ====================
+    // ==================== ОБНОВЛЁННЫЙ МЕТОД ИНИЦИАЛИЗАЦИИ СОБЫТИЙ ====================
     initializeEventListeners() {
         // Авторизация
         const loginBtn = document.getElementById('login-btn');
@@ -1435,6 +1626,7 @@ class CallEvaluationSystem {
             clearFiltersBtn.addEventListener('click', () => {
                 this.selectedManagers = [];
                 this.qualityFilter = 'all';
+                this.currentPage = 1; // Сброс на первую страницу
                 this.setupManagerFilters();
                 const viewStartDate = document.getElementById('viewStartDate');
                 const viewEndDate = document.getElementById('viewEndDate');
