@@ -1,0 +1,4 @@
+setup.sh
+systemd.service
+.env
+deploy.sh
