@@ -82,6 +82,11 @@ class APIClient {
         return data.data;
     }
 
+    async getAllManagers() {
+        const data = await this.request('/managers/all');
+        return data.data;
+    }
+
     async getEvaluations(filters = {}) {
         const params = new URLSearchParams();
         

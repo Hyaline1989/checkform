@@ -36,11 +36,13 @@
                 <button class="tab-button active" data-tab="evaluation">➕ Новая оценка</button>
                 <button class="tab-button" data-tab="view">👁️ Просмотр оценок</button>
                 <button class="tab-button" data-tab="stats">📈 Статистика</button>
+                <button class="tab-button" data-tab="employees">👥 Сотрудники</button>
             </nav>
 
             <!-- Вкладка новой оценки -->
             <div id="evaluation" class="tab-content active">
                 <form id="evaluationForm" class="evaluation-form">
+                    <!-- ... содержимое остается без изменений ... -->
                     <div class="form-section">
                         <h3>📋 Основная информация</h3>
                         <div class="form-row">
@@ -103,8 +105,9 @@
                         </div>
                     </div>
 
-                    <!-- Критерии оценки -->
+                    <!-- Критерии оценки (оставляем без изменений) -->
                     <div class="criteria-section">
+                        <!-- ... все критерии остаются как были ... -->
                         <!-- Установление контакта -->
                         <div class="criterion">
                             <h3>🤝 Установление контакта (30 баллов)</h3>
@@ -532,6 +535,30 @@
                     <!-- Статистика ошибок -->
                 </div>
             </div>
+
+            <!-- Вкладка управления сотрудниками -->
+            <div id="employees" class="tab-content">
+                <div class="employees-controls">
+                    <div class="filter-section">
+                        <h3>👥 Управление сотрудниками</h3>
+                        <div class="add-manager-form">
+                            <div class="form-row">
+                                <div class="form-group" style="flex: 1;">
+                                    <label for="newManagerName">ФИО нового сотрудника:</label>
+                                    <input type="text" id="newManagerName" placeholder="Введите ФИО">
+                                </div>
+                                <div class="form-group" style="justify-content: flex-end;">
+                                    <button id="addManagerBtn" class="action-btn" style="margin-top: 24px;">➕ Добавить</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="managersList" class="managers-list">
+                    <!-- Список сотрудников будет загружен динамически -->
+                </div>
+            </div>
         </div>
     </div>
 
@@ -543,6 +570,7 @@
     <script src="js/evaluations-list.js"></script>
     <script src="js/statistics.js"></script>
     <script src="js/export.js"></script>
+    <script src="js/employees.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

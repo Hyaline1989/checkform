@@ -1,5 +1,5 @@
 // Главный модуль - точка входа
-let apiClient, authManager, evaluationForm, evaluationsList, statistics, exportModule, pagination;
+let apiClient, authManager, evaluationForm, evaluationsList, statistics, exportModule, pagination, employeesModule;
 
 async function initManagerFilters() {
     try {
@@ -15,17 +15,17 @@ async function initManagerFilters() {
                 const div = document.createElement('div');
                 div.className = 'manager-checkbox';
                 div.innerHTML = `
-                    <input type="checkbox" id="filter-${manager.replace(/\s/g, '_')}" value="${manager}">
-                    <label for="filter-${manager.replace(/\s/g, '_')}">${manager}</label>
+                    <input type="checkbox" id="filter-${manager.id}" value="${manager.name}">
+                    <label for="filter-${manager.id}">${Utils.escapeHtml(manager.name)}</label>
                 `;
                 const checkbox = div.querySelector('input');
                 checkbox.addEventListener('change', (e) => {
                     if (e.target.checked) {
-                        if (!evaluationsList.filters.managers.includes(manager)) {
-                            evaluationsList.filters.managers.push(manager);
+                        if (!evaluationsList.filters.managers.includes(manager.name)) {
+                            evaluationsList.filters.managers.push(manager.name);
                         }
                     } else {
-                        const index = evaluationsList.filters.managers.indexOf(manager);
+                        const index = evaluationsList.filters.managers.indexOf(manager.name);
                         if (index > -1) evaluationsList.filters.managers.splice(index, 1);
                     }
                     evaluationsList.applyFilters();
@@ -40,17 +40,17 @@ async function initManagerFilters() {
                 const div = document.createElement('div');
                 div.className = 'manager-checkbox';
                 div.innerHTML = `
-                    <input type="checkbox" id="stats-${manager.replace(/\s/g, '_')}" value="${manager}">
-                    <label for="stats-${manager.replace(/\s/g, '_')}">${manager}</label>
+                    <input type="checkbox" id="stats-${manager.id}" value="${manager.name}">
+                    <label for="stats-${manager.id}">${Utils.escapeHtml(manager.name)}</label>
                 `;
                 const checkbox = div.querySelector('input');
                 checkbox.addEventListener('change', (e) => {
                     if (e.target.checked) {
-                        if (!statistics.selectedManagers.includes(manager)) {
-                            statistics.selectedManagers.push(manager);
+                        if (!statistics.selectedManagers.includes(manager.name)) {
+                            statistics.selectedManagers.push(manager.name);
                         }
                     } else {
-                        const index = statistics.selectedManagers.indexOf(manager);
+                        const index = statistics.selectedManagers.indexOf(manager.name);
                         if (index > -1) statistics.selectedManagers.splice(index, 1);
                     }
                 });
@@ -64,8 +64,8 @@ async function initManagerFilters() {
             managerSelect.innerHTML = '<option value="">Выберите МП</option>';
             managers.forEach(manager => {
                 const option = document.createElement('option');
-                option.value = manager;
-                option.textContent = manager;
+                option.value = manager.name;
+                option.textContent = manager.name;
                 managerSelect.appendChild(option);
             });
         }
@@ -90,6 +90,8 @@ function setupTabSwitching() {
                 await evaluationsList.loadData();
             } else if (tabName === 'stats') {
                 await statistics.calculate();
+            } else if (tabName === 'employees') {
+                await employeesModule.loadManagers();
             }
         });
     });
@@ -124,7 +126,39 @@ async function init() {
             statistics = new StatisticsModule(apiClient);
             exportModule = new ExportModule(apiClient, () => evaluationsList.filteredEvaluations);
             
+            // Инициализация модуля сотрудников
+            employeesModule = new EmployeesModule(apiClient);
+            
+            // Функция обновления списка менеджеров во всех местах
+            window.managerRefreshCallback = async () => {
+                // Обновляем выпадающий список в форме
+                const managers = await apiClient.getManagers();
+                const managerSelect = document.getElementById('managerName');
+                if (managerSelect) {
+                    const currentValue = managerSelect.value;
+                    managerSelect.innerHTML = '<option value="">Выберите МП</option>';
+                    managers.forEach(manager => {
+                        const option = document.createElement('option');
+                        option.value = manager.name;
+                        option.textContent = manager.name;
+                        managerSelect.appendChild(option);
+                    });
+                    if (currentValue && managers.some(m => m.name === currentValue)) {
+                        managerSelect.value = currentValue;
+                    }
+                }
+                
+                // Обновляем фильтры в просмотре оценок и статистике
+                if (evaluationsList) {
+                    await evaluationsList.refreshManagerFilters();
+                }
+                if (statistics) {
+                    await statistics.refreshManagerFilters();
+                }
+            };
+            
             await evaluationsList.loadData();
+            await employeesModule.loadManagers();
             
             // Сохраняем ссылку для доступа из onclick
             window.evaluationsList = evaluationsList;

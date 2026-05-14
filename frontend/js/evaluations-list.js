@@ -136,11 +136,14 @@ class EvaluationsList {
         }
 
         container.innerHTML = pageData.map(item => this.renderEvaluationItem(item)).join('');
+        
+        // Добавляем обработчики для удаления после рендера
+        this.attachDeleteHandlers();
     }
 
     renderEvaluationItem(item) {
         return `
-            <div class="evaluation-item" onclick="window.evaluationsList?.toggleDetails(this)">
+            <div class="evaluation-item" data-id="${item.id}" onclick="window.evaluationsList?.toggleDetails(this)">
                 <div class="evaluation-header">
                     <div class="evaluation-manager">
                         👤 ${Utils.escapeHtml(item.manager_name)}
@@ -187,6 +190,10 @@ class EvaluationsList {
                 </div>
             </div>
         `;
+    }
+
+    attachDeleteHandlers() {
+        // Обработчики уже добавлены через onclick в кнопках
     }
 
     renderComment(key, comment, title) {
@@ -267,5 +274,36 @@ class EvaluationsList {
         if (lastPageBtn) lastPageBtn.disabled = !canNext;
         
         this.pagination.renderPageNumbers('pageNumbers');
+    }
+
+    async refreshManagerFilters() {
+        const managers = await this.api.getAllManagers();
+        const managerFilter = document.getElementById('managerFilter');
+        
+        if (managerFilter) {
+            managerFilter.innerHTML = '';
+            managers.forEach(manager => {
+                const div = document.createElement('div');
+                div.className = 'manager-checkbox';
+                div.innerHTML = `
+                    <input type="checkbox" id="filter-${manager.id}" value="${manager.name}" ${!manager.is_active ? 'disabled' : ''}>
+                    <label for="filter-${manager.id}" style="${!manager.is_active ? 'opacity: 0.5;' : ''}">${Utils.escapeHtml(manager.name)}${!manager.is_active ? ' (архив)' : ''}</label>
+                `;
+                if (manager.is_active) {
+                    const checkbox = div.querySelector('input');
+                    checkbox.addEventListener('change', (e) => {
+                        if (e.target.checked) {
+                            if (!this.filters.managers.includes(manager.name)) {
+                                this.filters.managers.push(manager.name);
+                            }
+                        } else {
+                            const index = this.filters.managers.indexOf(manager.name);
+                            if (index > -1) this.filters.managers.splice(index, 1);
+                        }
+                    });
+                }
+                managerFilter.appendChild(div);
+            });
+        }
     }
 }

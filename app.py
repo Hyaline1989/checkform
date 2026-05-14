@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta
 import os
@@ -16,7 +16,7 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-i
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-jwt-key-change-in-production')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
-# Настройка базы данных - используем абсолютный путь
+# Настройка базы данных
 basedir = os.path.abspath(os.path.dirname(__file__))
 instance_path = os.path.join(basedir, 'instance')
 if not os.path.exists(instance_path):
@@ -26,7 +26,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_path,
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Инициализация расширений
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
 
@@ -38,7 +38,6 @@ class Evaluation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     
-    # Основная информация
     evaluation_date = db.Column(db.Date, nullable=False)
     manager_name = db.Column(db.String(200), nullable=False)
     phone_number = db.Column(db.String(50))
@@ -49,7 +48,6 @@ class Evaluation(db.Model):
     later_work = db.Column(db.String(10), nullable=False, default='нет')
     is_good_call = db.Column(db.String(10), nullable=False, default='нет')
     
-    # Критерии
     contact_score = db.Column(db.Integer, nullable=False, default=0)
     contact_errors = db.Column(db.Text)
     contact_comment = db.Column(db.Text)
@@ -107,24 +105,48 @@ class Evaluation(db.Model):
             'total_score': self.total_score
         }
 
-# ==================== СПИСОК МЕНЕДЖЕРОВ ====================
 
-MANAGERS_LIST = [
-    'Аксюбина Ангелина', 'Волков Алексей',
-    'Алексеева Татьяна','Жирякова Оксана', 'Конаныхина Татьяна',
-    'Мандрик Асель', 'Мельник Полина',
-    'Мищенко Дарья', 'Фролова Диана', 'Ходневич София',
-    'Чупрунова Ирина', 'Казначеева Динара', 'Васильчикова Диана'
-]
+class Manager(db.Model):
+    __tablename__ = 'managers'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False, unique=True)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
 
-# ==================== ИНИЦИАЛИЗАЦИЯ БАЗЫ ДАННЫХ ====================
+
+# ==================== ИНИЦИАЛИЗАЦИЯ ====================
 
 def init_db():
     with app.app_context():
         db.create_all()
+        
+        if Manager.query.count() == 0:
+            initial_managers = [
+                'Аксюбина Ангелина', 'Волков Алексей',
+                'Алексеева Татьяна', 'Жирякова Оксана', 'Конаныхина Татьяна',
+                'Мандрик Асель', 'Мельник Полина',
+                'Мищенко Дарья', 'Фролова Диана', 'Ходневич София',
+                'Чупрунова Ирина', 'Казначеева Динара', 'Васильчикова Диана'
+            ]
+            for manager_name in initial_managers:
+                manager = Manager(name=manager_name)
+                db.session.add(manager)
+            db.session.commit()
+            print("✅ Добавлены начальные сотрудники")
+        
         print("✅ База данных инициализирована")
 
-# ==================== СТРАНИЦЫ ФРОНТЕНДА ====================
+
+# ==================== СТАТИКА ====================
 
 @app.route('/')
 def serve_index():
@@ -136,14 +158,17 @@ def serve_static(path):
         return send_from_directory(app.static_folder, path)
     return send_from_directory(app.static_folder, 'index.html')
 
-# ==================== API ЭНДПОИНТЫ ====================
 
-@app.route('/api/login', methods=['POST'])
+# ==================== API АВТОРИЗАЦИЯ ====================
+
+@app.route('/api/login', methods=['POST', 'OPTIONS'])
 def login():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
     try:
         data = request.get_json()
         password = data.get('password')
-        
         admin_password = os.environ.get('ADMIN_PASSWORD', 'admin123')
         
         if password == admin_password:
@@ -159,27 +184,138 @@ def login():
                 'message': 'Неверный пароль'
             }), 401
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/verify', methods=['GET'])
-@jwt_required()
+
+@app.route('/api/verify', methods=['GET', 'OPTIONS'])
+@jwt_required(optional=True)
 def verify_token():
+    if request.method == 'OPTIONS':
+        return '', 200
     return jsonify({'valid': True}), 200
 
-@app.route('/api/managers', methods=['GET'])
-@jwt_required()
-def get_managers():
-    return jsonify({
-        'success': True,
-        'data': MANAGERS_LIST
-    }), 200
 
-@app.route('/api/evaluations', methods=['GET'])
-@jwt_required()
+# ==================== API УПРАВЛЕНИЕ СОТРУДНИКАМИ ====================
+
+@app.route('/api/managers', methods=['GET', 'OPTIONS'])
+@jwt_required(optional=True)
+def get_managers():
+    if request.method == 'OPTIONS':
+        return '', 200
+    try:
+        managers = Manager.query.filter_by(is_active=True).order_by(Manager.name).all()
+        return jsonify({'success': True, 'data': [m.to_dict() for m in managers]}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/managers/all', methods=['GET', 'OPTIONS'])
+@jwt_required(optional=True)
+def get_all_managers():
+    if request.method == 'OPTIONS':
+        return '', 200
+    try:
+        managers = Manager.query.order_by(Manager.name).all()
+        return jsonify({'success': True, 'data': [m.to_dict() for m in managers]}), 200
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/managers', methods=['POST', 'OPTIONS'])
+@jwt_required(optional=True)
+def add_manager():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    try:
+        data = request.get_json()
+        name = data.get('name', '').strip()
+        
+        if not name:
+            return jsonify({'success': False, 'message': 'Имя сотрудника не может быть пустым'}), 400
+        
+        existing = Manager.query.filter_by(name=name).first()
+        if existing:
+            if existing.is_active:
+                return jsonify({'success': False, 'message': f'Сотрудник "{name}" уже существует'}), 400
+            else:
+                existing.is_active = True
+                db.session.commit()
+                return jsonify({'success': True, 'data': existing.to_dict(), 'message': f'Сотрудник "{name}" восстановлен'}), 200
+        
+        manager = Manager(name=name)
+        db.session.add(manager)
+        db.session.commit()
+        
+        return jsonify({'success': True, 'data': manager.to_dict(), 'message': f'Сотрудник "{name}" добавлен'}), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/managers/<int:manager_id>', methods=['PUT', 'OPTIONS'])
+@jwt_required(optional=True)
+def update_manager(manager_id):
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    try:
+        data = request.get_json()
+        new_name = data.get('name', '').strip()
+        
+        if not new_name:
+            return jsonify({'success': False, 'message': 'Имя сотрудника не может быть пустым'}), 400
+        
+        manager = Manager.query.get(manager_id)
+        if not manager:
+            return jsonify({'success': False, 'message': 'Сотрудник не найден'}), 404
+        
+        existing = Manager.query.filter(Manager.name == new_name, Manager.id != manager_id).first()
+        if existing:
+            return jsonify({'success': False, 'message': f'Сотрудник с именем "{new_name}" уже существует'}), 400
+        
+        old_name = manager.name
+        manager.name = new_name
+        
+        evaluations = Evaluation.query.filter_by(manager_name=old_name).all()
+        for eval_item in evaluations:
+            eval_item.manager_name = new_name
+        
+        db.session.commit()
+        return jsonify({'success': True, 'data': manager.to_dict(), 'message': f'Сотрудник переименован'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/api/managers/<int:manager_id>', methods=['DELETE', 'OPTIONS'])
+@jwt_required(optional=True)
+def delete_manager(manager_id):
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    try:
+        manager = Manager.query.get(manager_id)
+        if not manager:
+            return jsonify({'success': False, 'message': 'Сотрудник не найден'}), 404
+        
+        manager.is_active = False
+        db.session.commit()
+        
+        return jsonify({'success': True, 'message': f'Сотрудник "{manager.name}" удален'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+# ==================== API ОЦЕНКИ ====================
+
+@app.route('/api/evaluations', methods=['GET', 'OPTIONS'])
+@jwt_required(optional=True)
 def get_evaluations():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
     try:
         search = request.args.get('search', '')
         start_date = request.args.get('start_date')
@@ -201,21 +337,17 @@ def get_evaluations():
             query = query.filter(Evaluation.is_good_call == is_good_call)
         
         evaluations = query.order_by(Evaluation.created_at.desc()).all()
-        
-        return jsonify({
-            'success': True,
-            'data': [e.to_dict() for e in evaluations]
-        }), 200
-        
+        return jsonify({'success': True, 'data': [e.to_dict() for e in evaluations]}), 200
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/evaluations', methods=['POST'])
-@jwt_required()
+
+@app.route('/api/evaluations', methods=['POST', 'OPTIONS'])
+@jwt_required(optional=True)
 def create_evaluation():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
     try:
         data = request.get_json()
         
@@ -255,48 +387,38 @@ def create_evaluation():
         db.session.add(evaluation)
         db.session.commit()
         
-        return jsonify({
-            'success': True,
-            'data': evaluation.to_dict(),
-            'message': 'Оценка успешно сохранена'
-        }), 201
-        
+        return jsonify({'success': True, 'data': evaluation.to_dict(), 'message': 'Оценка успешно сохранена'}), 201
     except Exception as e:
         db.session.rollback()
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/evaluations/<int:evaluation_id>', methods=['DELETE'])
-@jwt_required()
+
+@app.route('/api/evaluations/<int:evaluation_id>', methods=['DELETE', 'OPTIONS'])
+@jwt_required(optional=True)
 def delete_evaluation(evaluation_id):
+    if request.method == 'OPTIONS':
+        return '', 200
+        
     try:
         evaluation = Evaluation.query.get(evaluation_id)
         if not evaluation:
-            return jsonify({
-                'success': False,
-                'message': 'Оценка не найдена'
-            }), 404
+            return jsonify({'success': False, 'message': 'Оценка не найдена'}), 404
         
         db.session.delete(evaluation)
         db.session.commit()
         
-        return jsonify({
-            'success': True,
-            'message': 'Оценка удалена'
-        }), 200
-        
+        return jsonify({'success': True, 'message': 'Оценка удалена'}), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-@app.route('/api/stats', methods=['POST'])
-@jwt_required()
+
+@app.route('/api/stats', methods=['POST', 'OPTIONS'])
+@jwt_required(optional=True)
 def get_statistics():
+    if request.method == 'OPTIONS':
+        return '', 200
+        
     try:
         data = request.get_json()
         start_date = data.get('start_date')
@@ -321,7 +443,6 @@ def get_statistics():
             avg_presentation = sum(e.presentation_score for e in evaluations) / total_calls
             avg_objections = sum(e.objections_score for e in evaluations) / total_calls
             avg_closing = sum(e.closing_score for e in evaluations) / total_calls
-            
             good_calls = sum(1 for e in evaluations if e.is_good_call == 'да')
             target_calls = sum(1 for e in evaluations if e.is_target == 'да')
             later_work_calls = sum(1 for e in evaluations if e.later_work == 'да')
@@ -329,10 +450,7 @@ def get_statistics():
             avg_score = avg_contact = avg_presentation = avg_objections = avg_closing = 0
             good_calls = target_calls = later_work_calls = 0
         
-        errors_stats = {
-            'contact': {}, 'presentation': {}, 'objections': {},
-            'closing': {}, 'tov': {}, 'critical': 0
-        }
+        errors_stats = {'contact': {}, 'presentation': {}, 'objections': {}, 'closing': {}, 'tov': {}, 'critical': 0}
         
         for eval_item in evaluations:
             if eval_item.contact_errors:
@@ -373,16 +491,15 @@ def get_statistics():
                 'errors_stats': errors_stats
             }
         }), 200
-        
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'message': str(e)
-        }), 500
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-# ==================== ЗАПУСК ПРИЛОЖЕНИЯ ====================
+
+# ==================== ЗАПУСК ====================
 
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5002))
-    app.run(debug=False, host='0.0.0.0', port=port)
+    print(f"\n🚀 Сервер запущен на http://127.0.0.1:{port}")
+    print(f"🔑 Пароль для входа: {os.environ.get('ADMIN_PASSWORD', 'admin123')}\n")
+    app.run(debug=True, host='127.0.0.1', port=port)

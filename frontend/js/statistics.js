@@ -84,21 +84,21 @@ class StatisticsModule {
                 <h3>🎯 Статистика по целевым звонкам</h3>
                 <div class="additional-stats-grid">
                     <div class="additional-stat-card"><div class="additional-stat-label">Целевые звонки</div><div class="additional-stat-value">${stats.target_calls}</div><div>${targetPercentage}%</div></div>
-                    <div class="additional-stat-card"><div class="additional-stat-label">Нецелевые звонки</div><div class="additional-stat-value">${stats.total_calls - stats.target_calls}</div><div>${100 - targetPercentage}%</div></div>
+                    <div class="additional-stat-card"><div class="additional-stat-label">Нецелевые звонки</div><div class="additional-stat-value">${stats.total_calls - stats.target_calls}</div><div>${(100 - targetPercentage).toFixed(1)}%</div></div>
                 </div>
             </div>
             <div class="additional-stats-section">
                 <h3>🕒 Статистика по поиску работы на более позднее время</h3>
                 <div class="additional-stats-grid">
                     <div class="additional-stat-card"><div class="additional-stat-label">Искали работу позже</div><div class="additional-stat-value">${stats.later_work_calls}</div><div>${laterWorkPercentage}%</div></div>
-                    <div class="additional-stat-card"><div class="additional-stat-label">Не искали работу позже</div><div class="additional-stat-value">${stats.total_calls - stats.later_work_calls}</div><div>${100 - laterWorkPercentage}%</div></div>
+                    <div class="additional-stat-card"><div class="additional-stat-label">Не искали работу позже</div><div class="additional-stat-value">${stats.total_calls - stats.later_work_calls}</div><div>${(100 - laterWorkPercentage).toFixed(1)}%</div></div>
                 </div>
             </div>
             <div class="additional-stats-section">
                 <h3>🌟 Статистика по хорошим звонкам</h3>
                 <div class="additional-stats-grid">
                     <div class="additional-stat-card"><div class="additional-stat-label">Хорошие звонки</div><div class="additional-stat-value">${stats.good_calls}</div><div>${goodCallsPercentage}%</div></div>
-                    <div class="additional-stat-card"><div class="additional-stat-label">Обычные звонки</div><div class="additional-stat-value">${stats.total_calls - stats.good_calls}</div><div>${100 - goodCallsPercentage}%</div></div>
+                    <div class="additional-stat-card"><div class="additional-stat-label">Обычные звонки</div><div class="additional-stat-value">${stats.total_calls - stats.good_calls}</div><div>${(100 - goodCallsPercentage).toFixed(1)}%</div></div>
                 </div>
             </div>
         `;
@@ -134,15 +134,57 @@ class StatisticsModule {
         
         let html = `<div class="errors-section"><h3>${title}</h3>`;
         
-        Object.entries(errors)
-            .sort(([,a], [,b]) => b - a)
-            .forEach(([error, count]) => {
-                const percentage = ((count / totalCalls) * 100).toFixed(1);
-                html += `<div class="error-item"><span class="error-name">${Utils.escapeHtml(error)}</span><span class="error-percentage">${percentage}%</span><span class="error-count">${count}</span></div>`;
-            });
+        // Сортируем ошибки по убыванию количества
+        const sortedErrors = Object.entries(errors).sort(([,a], [,b]) => b - a);
+        
+        for (const [error, count] of sortedErrors) {
+            const percentage = ((count / totalCalls) * 100).toFixed(1);
+            html += `
+                <div class="error-item">
+                    <span class="error-name">${Utils.escapeHtml(error)}</span>
+                    <span class="error-percentage">${percentage}%</span>
+                    <span class="error-count">${count}</span>
+                </div>
+            `;
+        }
         
         html += '</div>';
         return html;
+    }
+
+    async refreshManagerFilters() {
+        try {
+            const managers = await this.api.getAllManagers();
+            const statsManagerFilter = document.getElementById('statsManagerFilter');
+            
+            if (statsManagerFilter) {
+                statsManagerFilter.innerHTML = '';
+                managers.forEach(manager => {
+                    const div = document.createElement('div');
+                    div.className = 'manager-checkbox';
+                    div.innerHTML = `
+                        <input type="checkbox" id="stats-${manager.id}" value="${manager.name}" ${!manager.is_active ? 'disabled' : ''}>
+                        <label for="stats-${manager.id}" style="${!manager.is_active ? 'opacity: 0.5;' : ''}">${Utils.escapeHtml(manager.name)}${!manager.is_active ? ' (архив)' : ''}</label>
+                    `;
+                    if (manager.is_active) {
+                        const checkbox = div.querySelector('input');
+                        checkbox.addEventListener('change', (e) => {
+                            if (e.target.checked) {
+                                if (!this.selectedManagers.includes(manager.name)) {
+                                    this.selectedManagers.push(manager.name);
+                                }
+                            } else {
+                                const index = this.selectedManagers.indexOf(manager.name);
+                                if (index > -1) this.selectedManagers.splice(index, 1);
+                            }
+                        });
+                    }
+                    statsManagerFilter.appendChild(div);
+                });
+            }
+        } catch (error) {
+            console.error('Ошибка обновления фильтров менеджеров:', error);
+        }
     }
 
     clearFilters() {
@@ -152,6 +194,12 @@ class StatisticsModule {
         
         if (startDate) startDate.value = '';
         if (endDate) endDate.value = '';
+        
+        // Сбрасываем все чекбоксы в фильтре менеджеров
+        const checkboxes = document.querySelectorAll('#statsManagerFilter input[type="checkbox"]');
+        checkboxes.forEach(cb => {
+            cb.checked = false;
+        });
         
         this.calculate();
         Utils.showMessage('✅ Фильтры статистики сброшены', 'success');

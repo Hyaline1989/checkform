@@ -1445,3 +1445,158 @@ html {
         display: block !important;
     }
 }
+
+/* ===== УПРАВЛЕНИЕ СОТРУДНИКАМИ ===== */
+.employees-controls {
+    background: #f8fdfc;
+    padding: 25px;
+    border-radius: 12px;
+    margin-bottom: 25px;
+    border: 1px solid #e0f2f1;
+}
+
+.add-manager-form {
+    margin-top: 15px;
+}
+
+.managers-list {
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e0f2f1;
+}
+
+.managers-table-container {
+    overflow-x: auto;
+}
+
+.managers-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.managers-table th,
+.managers-table td {
+    padding: 15px;
+    text-align: left;
+    border-bottom: 1px solid #e0f2f1;
+}
+
+.managers-table th {
+    background: #f8fdfc;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.managers-table tbody tr:hover {
+    background: #f8fdfc;
+}
+
+.manager-name-cell {
+    position: relative;
+}
+
+.manager-name-display {
+    display: inline-block;
+    padding: 5px 0;
+}
+
+.manager-name-edit {
+    width: 90%;
+    padding: 8px 12px;
+    border: 2px solid #4db6ac;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+}
+
+.actions-cell {
+    white-space: nowrap;
+}
+
+.actions-cell button {
+    padding: 8px 12px;
+    margin: 0 5px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.3s ease;
+}
+
+.edit-manager-btn {
+    background: #2196f3;
+    color: white;
+}
+
+.edit-manager-btn:hover {
+    background: #1976d2;
+}
+
+.save-manager-btn {
+    background: #4caf50;
+    color: white;
+}
+
+.save-manager-btn:hover {
+    background: #45a049;
+}
+
+.cancel-manager-btn {
+    background: #ff9800;
+    color: white;
+}
+
+.cancel-manager-btn:hover {
+    background: #fb8c00;
+}
+
+.delete-manager-btn {
+    background: #f44336;
+    color: white;
+}
+
+.delete-manager-btn:hover {
+    background: #da190b;
+}
+
+.empty-managers {
+    text-align: center;
+    padding: 50px;
+    color: #78909c;
+}
+
+.empty-managers p {
+    margin: 10px 0;
+}
+
+/* Адаптивность для таблицы сотрудников */
+@media (max-width: 768px) {
+    .managers-table th,
+    .managers-table td {
+        padding: 10px;
+    }
+    
+    .actions-cell button {
+        padding: 6px 10px;
+        margin: 2px;
+        font-size: 11px;
+    }
+    
+    .manager-name-edit {
+        width: 150px;
+    }
+}
+
+@media (max-width: 480px) {
+    .managers-table th:nth-child(3),
+    .managers-table td:nth-child(3) {
+        display: none;
+    }
+    
+    .actions-cell {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+}
