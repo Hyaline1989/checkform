@@ -75,11 +75,29 @@ class EvaluationForm {
 
         try {
             const evaluationData = this.collectFormData();
-            await this.api.createEvaluation(evaluationData);
             
-            Utils.showMessage('✅ Оценка успешно сохранена!', 'success');
+            // Проверяем, в режиме редактирования или создания
+            const editingId = window.evaluationsList?.editingId;
+            
+            if (editingId) {
+                // Режим редактирования
+                await this.api.updateEvaluation(editingId, evaluationData);
+                Utils.showMessage('✅ Оценка успешно обновлена!', 'success');
+                
+                // Сбрасываем режим редактирования
+                if (window.evaluationsList) {
+                    window.evaluationsList.resetEditMode();
+                }
+            } else {
+                // Режим создания
+                await this.api.createEvaluation(evaluationData);
+                Utils.showMessage('✅ Оценка успешно сохранена!', 'success');
+            }
             
             this.resetForm();
+            
+            // Прокрутка наверх страницы после успешного сохранения
+            window.scrollTo({ top: 0, behavior: 'smooth' });
             
             if (this.onSaveCallback) {
                 await this.onSaveCallback();

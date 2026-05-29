@@ -393,6 +393,60 @@ def create_evaluation():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+# НОВЫЙ МАРШРУТ: обновление оценки
+@app.route('/api/evaluations/<int:evaluation_id>', methods=['PUT', 'OPTIONS'])
+@jwt_required(optional=True)
+def update_evaluation(evaluation_id):
+    if request.method == 'OPTIONS':
+        return '', 200
+        
+    try:
+        evaluation = Evaluation.query.get(evaluation_id)
+        if not evaluation:
+            return jsonify({'success': False, 'message': 'Оценка не найдена'}), 404
+        
+        data = request.get_json()
+        
+        evaluation_date = datetime.strptime(data['evaluation_date'], '%Y-%m-%d').date()
+        call_date = datetime.strptime(data['call_date'], '%Y-%m-%d').date()
+        
+        # Обновляем все поля
+        evaluation.evaluation_date = evaluation_date
+        evaluation.manager_name = data['manager_name']
+        evaluation.phone_number = data.get('phone_number')
+        evaluation.lead_link = data.get('lead_link')
+        evaluation.call_date = call_date
+        evaluation.call_duration = data['call_duration']
+        evaluation.is_target = data['is_target']
+        evaluation.later_work = data['later_work']
+        evaluation.is_good_call = data['is_good_call']
+        evaluation.contact_score = data['contact_score']
+        evaluation.contact_errors = data.get('contact_errors')
+        evaluation.contact_comment = data.get('contact_comment')
+        evaluation.presentation_score = data['presentation_score']
+        evaluation.presentation_errors = data.get('presentation_errors')
+        evaluation.presentation_comment = data.get('presentation_comment')
+        evaluation.objections_score = data['objections_score']
+        evaluation.objections_errors = data.get('objections_errors')
+        evaluation.objections_comment = data.get('objections_comment')
+        evaluation.closing_score = data['closing_score']
+        evaluation.closing_errors = data.get('closing_errors')
+        evaluation.closing_comment = data.get('closing_comment')
+        evaluation.tov_score = data.get('tov_score', 0)
+        evaluation.tov_errors = data.get('tov_errors')
+        evaluation.tov_comment = data.get('tov_comment')
+        evaluation.critical_error = data.get('critical_error')
+        evaluation.overall_comment = data.get('overall_comment')
+        evaluation.total_score = data['total_score']
+        
+        db.session.commit()
+        
+        return jsonify({'success': True, 'data': evaluation.to_dict(), 'message': 'Оценка успешно обновлена'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @app.route('/api/evaluations/<int:evaluation_id>', methods=['DELETE', 'OPTIONS'])
 @jwt_required(optional=True)
 def delete_evaluation(evaluation_id):

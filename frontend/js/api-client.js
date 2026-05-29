@@ -115,6 +115,14 @@ class APIClient {
         return data.data;
     }
 
+    async updateEvaluation(id, evaluationData) {
+        const data = await this.request(`/evaluations/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(evaluationData)
+        });
+        return data.data;
+    }
+
     async deleteEvaluation(id) {
         const data = await this.request(`/evaluations/${id}`, {
             method: 'DELETE'

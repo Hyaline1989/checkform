@@ -1,11 +1,13 @@
 // Модуль отображения списка оценок
 class EvaluationsList {
-    constructor(apiClient, pagination, onDeleteCallback) {
+    constructor(apiClient, pagination, onDeleteCallback, onEditCallback) {
         this.api = apiClient;
         this.pagination = pagination;
         this.onDeleteCallback = onDeleteCallback;
+        this.onEditCallback = onEditCallback;
         this.evaluations = [];
         this.filteredEvaluations = [];
+        this.editingId = null;
         this.filters = {
             search: '',
             startDate: '',
@@ -93,7 +95,22 @@ class EvaluationsList {
     applyFilters() {
         this.filters.startDate = document.getElementById('viewStartDate')?.value || '';
         this.filters.endDate = document.getElementById('viewEndDate')?.value || '';
+        
+        this.syncManagersFromCheckboxes();
+        
         this.loadData();
+    }
+    
+    syncManagersFromCheckboxes() {
+        const managerCheckboxes = document.querySelectorAll('#managerFilter input[type="checkbox"]:checked');
+        this.filters.managers = Array.from(managerCheckboxes).map(cb => cb.value);
+    }
+    
+    syncCheckboxesFromManagers() {
+        const managerCheckboxes = document.querySelectorAll('#managerFilter input[type="checkbox"]');
+        managerCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.filters.managers.includes(checkbox.value);
+        });
     }
 
     clearFilters() {
@@ -113,7 +130,13 @@ class EvaluationsList {
         if (viewEndDate) viewEndDate.value = '';
         if (searchInput) searchInput.value = '';
         
-        document.getElementById('quality-all').checked = true;
+        const qualityAllRadio = document.getElementById('quality-all');
+        if (qualityAllRadio) qualityAllRadio.checked = true;
+        
+        const managerCheckboxes = document.querySelectorAll('#managerFilter input[type="checkbox"]');
+        managerCheckboxes.forEach(checkbox => {
+            checkbox.checked = false;
+        });
         
         this.loadData();
         Utils.showMessage('✅ Фильтры сброшены', 'success');
@@ -137,21 +160,20 @@ class EvaluationsList {
 
         container.innerHTML = pageData.map(item => this.renderEvaluationItem(item)).join('');
         
-        // Добавляем обработчики для удаления после рендера
-        this.attachDeleteHandlers();
+        this.attachActionHandlers();
     }
 
     renderEvaluationItem(item) {
         return `
-            <div class="evaluation-item" data-id="${item.id}" onclick="window.evaluationsList?.toggleDetails(this)">
-                <div class="evaluation-header">
+            <div class="evaluation-item" data-id="${item.id}">
+                <div class="evaluation-header" onclick="window.evaluationsList?.toggleDetails(this.parentElement)">
                     <div class="evaluation-manager">
                         👤 ${Utils.escapeHtml(item.manager_name)}
                         ${item.is_good_call === 'да' ? '<span class="evaluation-good-call">🌟 Хороший звонок</span>' : ''}
                     </div>
                     <div class="evaluation-score">${item.total_score}/100</div>
                 </div>
-                <div class="evaluation-details">
+                <div class="evaluation-details" onclick="window.evaluationsList?.toggleDetails(this.parentElement)">
                     <div>📅 Дата звонка: ${Utils.formatDate(item.call_date)}</div>
                     <div>⏱️ Длительность: ${item.call_duration}</div>
                     <div>🎯 Целевой: ${item.is_target}</div>
@@ -161,7 +183,7 @@ class EvaluationsList {
                     ${item.phone_number ? `<div>📞 Телефон: ${Utils.escapeHtml(item.phone_number)}</div>` : ''}
                     ${item.lead_link ? `<div>🔗 Ссылка: <a href="${Utils.escapeHtml(item.lead_link)}" target="_blank">${Utils.escapeHtml(item.lead_link)}</a></div>` : ''}
                 </div>
-                <div class="expand-icon">▼</div>
+                <div class="expand-icon" onclick="window.evaluationsList?.toggleDetails(this.parentElement)">▼</div>
                 
                 <div class="evaluation-content">
                     <div class="score-breakdown">
@@ -184,16 +206,135 @@ class EvaluationsList {
                     
                     ${item.overall_comment ? `<div class="evaluation-comments"><strong>💬 Общий комментарий:</strong> ${Utils.escapeHtml(item.overall_comment)}</div>` : ''}
                     
-                    <button onclick="event.stopPropagation(); window.evaluationsList?.deleteEvaluation(${item.id})" class="delete-btn">
-                        🗑️ Удалить
-                    </button>
+                    <div class="action-buttons">
+                        <button onclick="event.stopPropagation(); window.evaluationsList?.editEvaluation(${item.id})" class="edit-btn">
+                            ✏️ Редактировать
+                        </button>
+                        <button onclick="event.stopPropagation(); window.evaluationsList?.deleteEvaluation(${item.id})" class="delete-btn">
+                            🗑️ Удалить
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
     }
 
-    attachDeleteHandlers() {
-        // Обработчики уже добавлены через onclick в кнопках
+    async editEvaluation(id) {
+        const evaluation = this.evaluations.find(e => e.id === id);
+        if (!evaluation) {
+            Utils.showMessage('❌ Оценка не найдена', 'error');
+            return;
+        }
+        
+        // Переключаемся на вкладку формы
+        const evaluationTab = document.querySelector('[data-tab="evaluation"]');
+        if (evaluationTab) evaluationTab.click();
+        
+        // Заполняем форму данными оценки
+        this.fillFormWithEvaluation(evaluation);
+        
+        // Сохраняем ID редактируемой оценки
+        this.editingId = id;
+        
+        // Меняем текст кнопки сохранения
+        const submitBtn = document.querySelector('#evaluationForm .submit-btn');
+        if (submitBtn) {
+            submitBtn.textContent = '✏️ Обновить оценку';
+            submitBtn.classList.add('editing-mode');
+        }
+        
+        Utils.showMessage('✏️ Режим редактирования. Внесите изменения и нажмите "Обновить оценку"', 'info');
+    }
+    
+    fillFormWithEvaluation(evaluation) {
+        // Основная информация
+        document.getElementById('evaluationDate').value = evaluation.evaluation_date;
+        document.getElementById('managerName').value = evaluation.manager_name;
+        document.getElementById('phoneNumber').value = evaluation.phone_number || '';
+        document.getElementById('leadLink').value = evaluation.lead_link || '';
+        document.getElementById('callDate').value = evaluation.call_date;
+        document.getElementById('callDuration').value = evaluation.call_duration;
+        document.getElementById('isTarget').value = evaluation.is_target;
+        document.getElementById('laterWork').value = evaluation.later_work;
+        document.getElementById('isGoodCall').value = evaluation.is_good_call;
+        
+        // Баллы
+        document.getElementById('contactScore').value = evaluation.contact_score;
+        document.getElementById('presentationScore').value = evaluation.presentation_score;
+        document.getElementById('objectionsScore').value = evaluation.objections_score;
+        document.getElementById('closingScore').value = evaluation.closing_score;
+        document.getElementById('tovScore').value = evaluation.tov_score;
+        
+        // Очищаем все чекбоксы перед заполнением
+        Utils.clearAllErrorCheckboxes();
+        
+        // Заполняем ошибки
+        this.fillErrorsFromString('contact', evaluation.contact_errors);
+        this.fillErrorsFromString('presentation', evaluation.presentation_errors);
+        this.fillErrorsFromString('objections', evaluation.objections_errors);
+        this.fillErrorsFromString('closing', evaluation.closing_errors);
+        this.fillErrorsFromString('tov', evaluation.tov_errors);
+        
+        // Комментарии
+        document.getElementById('contactComment').value = evaluation.contact_comment || '';
+        document.getElementById('presentationComment').value = evaluation.presentation_comment || '';
+        document.getElementById('objectionsComment').value = evaluation.objections_comment || '';
+        document.getElementById('closingComment').value = evaluation.closing_comment || '';
+        document.getElementById('tovComment').value = evaluation.tov_comment || '';
+        
+        // Итоги
+        document.getElementById('criticalError').value = evaluation.critical_error || '';
+        document.getElementById('overallComment').value = evaluation.overall_comment || '';
+        
+        // Обновляем итоговый балл
+        Utils.updateTotalScore();
+        
+        // Прокручиваем к форме
+        document.getElementById('evaluation').scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    fillErrorsFromString(prefix, errorsString) {
+        if (!errorsString) return;
+        
+        const errors = errorsString.split('; ');
+        const checkboxes = document.querySelectorAll(`input[id^="${prefix}Error"]`);
+        
+        checkboxes.forEach(checkbox => {
+            if (errors.includes(checkbox.value)) {
+                checkbox.checked = true;
+            }
+        });
+        
+        // Если есть ошибка "Ок"
+        const okCheckbox = document.getElementById(`${prefix}Ok`);
+        if (okCheckbox && errors.includes('Ок')) {
+            okCheckbox.checked = true;
+            // Отключаем остальные чекбоксы
+            checkboxes.forEach(cb => {
+                cb.disabled = true;
+            });
+        }
+    }
+    
+    resetEditMode() {
+        this.editingId = null;
+        const submitBtn = document.querySelector('#evaluationForm .submit-btn');
+        if (submitBtn) {
+            submitBtn.textContent = '💾 Сохранить оценку';
+            submitBtn.classList.remove('editing-mode');
+        }
+        // Сбрасываем форму
+        const form = document.getElementById('evaluationForm');
+        if (form) {
+            form.reset();
+            Utils.setDefaultDates();
+            Utils.updateTotalScore();
+            Utils.clearAllErrorCheckboxes();
+        }
+    }
+
+    attachActionHandlers() {
+        // Обработчики уже добавлены через onclick
     }
 
     renderComment(key, comment, title) {
@@ -300,6 +441,7 @@ class EvaluationsList {
                             const index = this.filters.managers.indexOf(manager.name);
                             if (index > -1) this.filters.managers.splice(index, 1);
                         }
+                        this.applyFilters();
                     });
                 }
                 managerFilter.appendChild(div);

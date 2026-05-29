@@ -92,6 +92,11 @@ function setupTabSwitching() {
                 await statistics.calculate();
             } else if (tabName === 'employees') {
                 await employeesModule.loadManagers();
+            } else if (tabName === 'evaluation') {
+                // Если переключились на форму и есть режим редактирования - сбрасываем его
+                if (evaluationsList && evaluationsList.editingId) {
+                    evaluationsList.resetEditMode();
+                }
             }
         });
     });
