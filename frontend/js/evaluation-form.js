@@ -3,6 +3,7 @@ class EvaluationForm {
     constructor(apiClient, onSaveCallback) {
         this.api = apiClient;
         this.onSaveCallback = onSaveCallback;
+        this.isFormSubmitted = false;
         this.init();
     }
 
@@ -20,21 +21,30 @@ class EvaluationForm {
             const okCheckbox = document.getElementById(`${criterion}Ok`);
             if (!okCheckbox) return;
             
+            // Удаляем старые обработчики, если есть
+            const newOkCheckbox = okCheckbox.cloneNode(true);
+            okCheckbox.parentNode.replaceChild(newOkCheckbox, okCheckbox);
+            
             const errorCheckboxes = document.querySelectorAll(`input[id^="${criterion}Error"]`);
             
-            okCheckbox.addEventListener('change', (e) => {
+            newOkCheckbox.addEventListener('change', (e) => {
                 errorCheckboxes.forEach(cb => {
-                    cb.checked = false;
-                    cb.disabled = e.target.checked;
+                    const newCb = cb;
+                    newCb.checked = false;
+                    newCb.disabled = e.target.checked;
                 });
             });
             
             errorCheckboxes.forEach(cb => {
-                cb.addEventListener('change', (e) => {
+                const newCb = cb.cloneNode(true);
+                cb.parentNode.replaceChild(newCb, cb);
+                
+                newCb.addEventListener('change', (e) => {
                     if (e.target.checked) {
-                        okCheckbox.checked = false;
+                        newOkCheckbox.checked = false;
                         errorCheckboxes.forEach(errorCb => {
-                            errorCb.disabled = false;
+                            const freshCb = document.getElementById(errorCb.id);
+                            if (freshCb) freshCb.disabled = false;
                         });
                     }
                 });
@@ -45,33 +55,55 @@ class EvaluationForm {
     setupDurationInput() {
         const durationInput = document.getElementById('callDuration');
         if (durationInput) {
-            durationInput.addEventListener('input', (e) => {
+            const newInput = durationInput.cloneNode(true);
+            durationInput.parentNode.replaceChild(newInput, durationInput);
+            
+            newInput.addEventListener('input', (e) => {
                 e.target.value = Utils.formatDuration(e.target.value);
             });
         }
     }
 
     setupScoreListeners() {
-        document.querySelectorAll('.criterion input[type="number"]').forEach(input => {
-            input.addEventListener('input', () => Utils.updateTotalScore());
+        const scoreInputs = document.querySelectorAll('.criterion input[type="number"]');
+        scoreInputs.forEach(input => {
+            const newInput = input.cloneNode(true);
+            input.parentNode.replaceChild(newInput, input);
+            
+            newInput.addEventListener('input', () => Utils.updateTotalScore());
         });
     }
 
     setupFormSubmit() {
         const form = document.getElementById('evaluationForm');
         if (form) {
-            form.addEventListener('submit', (e) => this.save(e));
+            // Удаляем старый обработчик, если есть
+            const newForm = form.cloneNode(true);
+            form.parentNode.replaceChild(newForm, form);
+            
+            newForm.addEventListener('submit', (e) => this.save(e));
         }
     }
 
     async save(e) {
         e.preventDefault();
         
+        // Защита от двойной отправки
+        if (this.isFormSubmitted) {
+            console.log('Форма уже отправляется, игнорируем повторный вызов');
+            return;
+        }
+        
         if (!this.onSaveCallback) return;
 
         this.clearValidationErrors();
 
-        if (this.validateForm()) return;
+        if (this.validateForm()) {
+            this.isFormSubmitted = false;
+            return;
+        }
+
+        this.isFormSubmitted = true;
 
         try {
             const evaluationData = this.collectFormData();
@@ -106,6 +138,8 @@ class EvaluationForm {
         } catch (error) {
             console.error('Ошибка при сохранении:', error);
             Utils.showMessage(`❌ Ошибка при сохранении: ${error.message}`, 'error');
+        } finally {
+            this.isFormSubmitted = false;
         }
     }
 
@@ -153,7 +187,8 @@ class EvaluationForm {
     }
 
     resetForm() {
-        document.getElementById('evaluationForm').reset();
+        const form = document.getElementById('evaluationForm');
+        if (form) form.reset();
         Utils.setDefaultDates();
         Utils.updateTotalScore();
         Utils.clearAllErrorCheckboxes();

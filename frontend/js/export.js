@@ -3,23 +3,36 @@ class ExportModule {
     constructor(apiClient, getDataCallback) {
         this.api = apiClient;
         this.getDataCallback = getDataCallback;
+        this.isExporting = false;
         this.init();
     }
 
     init() {
         const exportBtn = document.getElementById('exportBtn');
         if (exportBtn) {
-            exportBtn.addEventListener('click', () => this.exportToExcel());
+            // Удаляем старый обработчик, если есть
+            const newBtn = exportBtn.cloneNode(true);
+            exportBtn.parentNode.replaceChild(newBtn, exportBtn);
+            
+            newBtn.addEventListener('click', (e) => this.exportToExcel(e));
         }
     }
 
-    async exportToExcel() {
+    async exportToExcel(event) {
+        // Защита от двойного клика
+        if (this.isExporting) {
+            console.log('Экспорт уже выполняется, игнорируем повторный вызов');
+            return;
+        }
+        
         const data = this.getDataCallback ? await this.getDataCallback() : [];
         
         if (!data || data.length === 0) {
             Utils.showMessage('❌ Нет данных для экспорта', 'error');
             return;
         }
+
+        this.isExporting = true;
 
         const headers = [
             'ФИО МП', 'Дата проверки', 'Дата звонка', 'Длительность звонка',
@@ -65,6 +78,8 @@ class ExportModule {
         } catch (error) {
             console.error('Ошибка при экспорте:', error);
             Utils.showMessage('❌ Ошибка при экспорте в Excel', 'error');
+        } finally {
+            this.isExporting = false;
         }
     }
 }

@@ -1,5 +1,6 @@
 // Главный модуль - точка входа
 let apiClient, authManager, evaluationForm, evaluationsList, statistics, exportModule, pagination, employeesModule;
+let isInitialized = false;
 
 async function initManagerFilters() {
     try {
@@ -9,7 +10,7 @@ async function initManagerFilters() {
         const managerFilter = document.getElementById('managerFilter');
         const statsManagerFilter = document.getElementById('statsManagerFilter');
         
-        if (managerFilter) {
+        if (managerFilter && managerFilter.children.length === 0) {
             managerFilter.innerHTML = '';
             managers.forEach(manager => {
                 const div = document.createElement('div');
@@ -34,7 +35,7 @@ async function initManagerFilters() {
             });
         }
         
-        if (statsManagerFilter) {
+        if (statsManagerFilter && statsManagerFilter.children.length === 0) {
             statsManagerFilter.innerHTML = '';
             managers.forEach(manager => {
                 const div = document.createElement('div');
@@ -60,7 +61,7 @@ async function initManagerFilters() {
         
         // Заполнение выпадающего списка в форме
         const managerSelect = document.getElementById('managerName');
-        if (managerSelect) {
+        if (managerSelect && managerSelect.children.length <= 1) {
             managerSelect.innerHTML = '<option value="">Выберите МП</option>';
             managers.forEach(manager => {
                 const option = document.createElement('option');
@@ -76,8 +77,12 @@ async function initManagerFilters() {
 }
 
 function setupTabSwitching() {
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.addEventListener('click', async (e) => {
+    const tabs = document.querySelectorAll('.tab-button');
+    tabs.forEach(button => {
+        const newButton = button.cloneNode(true);
+        button.parentNode.replaceChild(newButton, button);
+        
+        newButton.addEventListener('click', async (e) => {
             const tabName = e.target.dataset.tab;
             
             document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
@@ -93,7 +98,6 @@ function setupTabSwitching() {
             } else if (tabName === 'employees') {
                 await employeesModule.loadManagers();
             } else if (tabName === 'evaluation') {
-                // Если переключились на форму и есть режим редактирования - сбрасываем его
                 if (evaluationsList && evaluationsList.editingId) {
                     evaluationsList.resetEditMode();
                 }
@@ -103,6 +107,12 @@ function setupTabSwitching() {
 }
 
 async function init() {
+    // Защита от повторной инициализации
+    if (isInitialized) {
+        console.log('Приложение уже инициализировано');
+        return;
+    }
+    
     // Инициализация API клиента
     apiClient = new APIClient();
     
@@ -116,27 +126,45 @@ async function init() {
             Utils.setDefaultDates();
             Utils.updateTotalScore();
             
-            // Инициализация модулей после авторизации
-            pagination = new Pagination(20);
+            // Инициализация модулей после авторизации (только один раз)
+            if (!pagination) {
+                pagination = new Pagination(20);
+                
+                pagination.onPageChange(() => {
+                    if (evaluationsList) {
+                        evaluationsList.render();
+                        evaluationsList.updatePaginationControls();
+                    }
+                });
+            }
             
-            evaluationsList = new EvaluationsList(apiClient, pagination, async () => {
-                if (statistics) await statistics.calculate();
-            });
+            if (!evaluationsList) {
+                evaluationsList = new EvaluationsList(apiClient, pagination, async () => {
+                    if (statistics) await statistics.calculate();
+                });
+            }
             
-            evaluationForm = new EvaluationForm(apiClient, async () => {
-                await evaluationsList.loadData();
-                if (statistics) await statistics.calculate();
-            });
+            if (!evaluationForm) {
+                evaluationForm = new EvaluationForm(apiClient, async () => {
+                    await evaluationsList.loadData();
+                    if (statistics) await statistics.calculate();
+                });
+            }
             
-            statistics = new StatisticsModule(apiClient);
-            exportModule = new ExportModule(apiClient, () => evaluationsList.filteredEvaluations);
+            if (!statistics) {
+                statistics = new StatisticsModule(apiClient);
+            }
             
-            // Инициализация модуля сотрудников
-            employeesModule = new EmployeesModule(apiClient);
+            if (!exportModule) {
+                exportModule = new ExportModule(apiClient, () => evaluationsList.filteredEvaluations);
+            }
+            
+            if (!employeesModule) {
+                employeesModule = new EmployeesModule(apiClient);
+            }
             
             // Функция обновления списка менеджеров во всех местах
             window.managerRefreshCallback = async () => {
-                // Обновляем выпадающий список в форме
                 const managers = await apiClient.getManagers();
                 const managerSelect = document.getElementById('managerName');
                 if (managerSelect) {
@@ -153,7 +181,6 @@ async function init() {
                     }
                 }
                 
-                // Обновляем фильтры в просмотре оценок и статистике
                 if (evaluationsList) {
                     await evaluationsList.refreshManagerFilters();
                 }
@@ -175,43 +202,60 @@ async function init() {
     
     await authManager.checkAuthentication();
     
-    // Настройка обработчиков входа
-    const loginBtn = document.getElementById('login-btn');
-    const passwordInput = document.getElementById('password');
-    
-    if (loginBtn) {
-        loginBtn.addEventListener('click', async (e) => {
-            e.preventDefault();
-            const password = passwordInput ? passwordInput.value : '';
+    // Настройка обработчиков входа (только один раз)
+    if (!window.loginHandlersSet) {
+        window.loginHandlersSet = true;
+        
+        const loginBtn = document.getElementById('login-btn');
+        const passwordInput = document.getElementById('password');
+        
+        if (loginBtn) {
+            const newLoginBtn = loginBtn.cloneNode(true);
+            loginBtn.parentNode.replaceChild(newLoginBtn, loginBtn);
             
-            if (!password) {
-                Utils.showMessage('❌ Введите пароль', 'error');
-                return;
-            }
+            newLoginBtn.addEventListener('click', async (e) => {
+                e.preventDefault();
+                const password = passwordInput ? passwordInput.value : '';
+                
+                if (!password) {
+                    Utils.showMessage('❌ Введите пароль', 'error');
+                    return;
+                }
+                
+                if (await authManager.login(password)) {
+                    Utils.showMessage('✅ Вход успешен!', 'success');
+                } else {
+                    Utils.showMessage('❌ Неверный пароль', 'error');
+                }
+            });
+        }
+        
+        if (passwordInput) {
+            const newPasswordInput = passwordInput.cloneNode(true);
+            passwordInput.parentNode.replaceChild(newPasswordInput, passwordInput);
             
-            if (await authManager.login(password)) {
-                Utils.showMessage('✅ Вход успешен!', 'success');
-            } else {
-                Utils.showMessage('❌ Неверный пароль', 'error');
-            }
-        });
-    }
-    
-    if (passwordInput) {
-        passwordInput.addEventListener('keypress', async (e) => {
-            if (e.key === 'Enter' && loginBtn) loginBtn.click();
-        });
-    }
-    
-    const logoutBtn = document.getElementById('logout-btn');
-    if (logoutBtn) {
-        logoutBtn.addEventListener('click', () => {
-            authManager.logout();
-            Utils.showMessage('✅ Выход выполнен', 'success');
-        });
+            newPasswordInput.addEventListener('keypress', async (e) => {
+                if (e.key === 'Enter') {
+                    const btn = document.getElementById('login-btn');
+                    if (btn) btn.click();
+                }
+            });
+        }
+        
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            const newLogoutBtn = logoutBtn.cloneNode(true);
+            logoutBtn.parentNode.replaceChild(newLogoutBtn, logoutBtn);
+            
+            newLogoutBtn.addEventListener('click', () => {
+                authManager.logout();
+                Utils.showMessage('✅ Выход выполнен', 'success');
+            });
+        }
     }
     
     setupTabSwitching();
+    isInitialized = true;
 }
 
 // Запуск приложения
