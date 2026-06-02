@@ -57,17 +57,53 @@ class EvaluationsList {
     }
 
     setupPagination() {
-        this.pagination.onPageChange(() => this.render());
-        
-        document.getElementById('firstPage')?.addEventListener('click', () => this.pagination.firstPage());
-        document.getElementById('prevPage')?.addEventListener('click', () => this.pagination.prevPage());
-        document.getElementById('nextPage')?.addEventListener('click', () => this.pagination.nextPage());
-        document.getElementById('lastPage')?.addEventListener('click', () => this.pagination.lastPage());
-        
-        document.getElementById('pageSize')?.addEventListener('change', (e) => {
-            this.pagination.setItemsPerPage(parseInt(e.target.value));
+        // Подписываемся на изменение страницы
+        this.pagination.onPageChange(() => {
             this.render();
+            this.updatePaginationControls();
         });
+        
+        const firstPageBtn = document.getElementById('firstPage');
+        const prevPageBtn = document.getElementById('prevPage');
+        const nextPageBtn = document.getElementById('nextPage');
+        const lastPageBtn = document.getElementById('lastPage');
+        const pageSizeSelect = document.getElementById('pageSize');
+        
+        if (firstPageBtn) {
+            firstPageBtn.addEventListener('click', () => {
+                this.pagination.firstPage();
+                this.forceUpdatePaginationDisplay();
+            });
+        }
+        if (prevPageBtn) {
+            prevPageBtn.addEventListener('click', () => {
+                this.pagination.prevPage();
+                this.forceUpdatePaginationDisplay();
+            });
+        }
+        if (nextPageBtn) {
+            nextPageBtn.addEventListener('click', () => {
+                this.pagination.nextPage();
+                this.forceUpdatePaginationDisplay();
+            });
+        }
+        if (lastPageBtn) {
+            lastPageBtn.addEventListener('click', () => {
+                this.pagination.lastPage();
+                this.forceUpdatePaginationDisplay();
+            });
+        }
+        
+        if (pageSizeSelect) {
+            pageSizeSelect.addEventListener('change', (e) => {
+                const newSize = parseInt(e.target.value);
+                this.pagination.setItemsPerPage(newSize);
+                setTimeout(() => {
+                    this.forceUpdatePaginationDisplay();
+                    this.render();
+                }, 50);
+            });
+        }
     }
 
     async loadData() {
@@ -83,12 +119,15 @@ class EvaluationsList {
             this.evaluations = await this.api.getEvaluations(filters);
             this.filteredEvaluations = [...this.evaluations];
             this.pagination.setTotalItems(this.filteredEvaluations.length);
-            this.render();
-            this.updatePaginationControls();
+            // setTotalItems вызовет onPageChange, который вызовет render и updatePaginationControls
             
         } catch (error) {
             console.error('Ошибка загрузки данных:', error);
             Utils.showMessage('❌ Ошибка загрузки данных: ' + error.message, 'error');
+            this.filteredEvaluations = [];
+            this.pagination.setTotalItems(0);
+            this.render();
+            this.updatePaginationControls();
         }
     }
 
@@ -98,6 +137,8 @@ class EvaluationsList {
         
         this.syncManagersFromCheckboxes();
         
+        // Сбрасываем на первую страницу при применении фильтров
+        this.pagination.currentPage = 1;
         this.loadData();
     }
     
@@ -138,6 +179,8 @@ class EvaluationsList {
             checkbox.checked = false;
         });
         
+        // Сбрасываем на первую страницу
+        this.pagination.currentPage = 1;
         this.loadData();
         Utils.showMessage('✅ Фильтры сброшены', 'success');
     }
@@ -398,8 +441,16 @@ class EvaluationsList {
         const currentRangeEl = document.getElementById('currentRange');
         const totalEvaluationsEl = document.getElementById('totalEvaluations');
         
-        if (currentRangeEl) currentRangeEl.textContent = `${info.startIndex}-${info.endIndex}`;
-        if (totalEvaluationsEl) totalEvaluationsEl.textContent = info.totalItems;
+        if (currentRangeEl) {
+            if (info.totalItems === 0) {
+                currentRangeEl.textContent = '0-0';
+            } else {
+                currentRangeEl.textContent = `${info.startIndex}-${info.endIndex}`;
+            }
+        }
+        if (totalEvaluationsEl) {
+            totalEvaluationsEl.textContent = info.totalItems;
+        }
         
         const firstPageBtn = document.getElementById('firstPage');
         const prevPageBtn = document.getElementById('prevPage');
@@ -414,7 +465,42 @@ class EvaluationsList {
         if (nextPageBtn) nextPageBtn.disabled = !canNext;
         if (lastPageBtn) lastPageBtn.disabled = !canNext;
         
+        // Обновляем отображение номеров страниц с учетом текущей страницы
         this.pagination.renderPageNumbers('pageNumbers');
+    }
+    
+    forceUpdatePaginationDisplay() {
+        const info = this.pagination.getPageInfo();
+        const currentRangeEl = document.getElementById('currentRange');
+        const totalEvaluationsEl = document.getElementById('totalEvaluations');
+        
+        if (currentRangeEl) {
+            if (info.totalItems === 0) {
+                currentRangeEl.textContent = '0-0';
+            } else {
+                currentRangeEl.textContent = `${info.startIndex}-${info.endIndex}`;
+            }
+        }
+        if (totalEvaluationsEl) {
+            totalEvaluationsEl.textContent = info.totalItems;
+        }
+        
+        // Обновляем активные кнопки страниц
+        this.pagination.renderPageNumbers('pageNumbers');
+        
+        // Обновляем состояние кнопок навигации
+        const firstPageBtn = document.getElementById('firstPage');
+        const prevPageBtn = document.getElementById('prevPage');
+        const nextPageBtn = document.getElementById('nextPage');
+        const lastPageBtn = document.getElementById('lastPage');
+        
+        const canPrev = this.pagination.canGoPrev();
+        const canNext = this.pagination.canGoNext();
+        
+        if (firstPageBtn) firstPageBtn.disabled = !canPrev;
+        if (prevPageBtn) prevPageBtn.disabled = !canPrev;
+        if (nextPageBtn) nextPageBtn.disabled = !canNext;
+        if (lastPageBtn) lastPageBtn.disabled = !canNext;
     }
 
     async refreshManagerFilters() {

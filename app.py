@@ -14,7 +14,7 @@ app = Flask(__name__, static_folder='frontend', static_url_path='')
 # Конфигурация
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-jwt-key-change-in-production')
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)  # Изменено с 24 часов на 7 дней
 
 # Настройка базы данных
 basedir = os.path.abspath(os.path.dirname(__file__))

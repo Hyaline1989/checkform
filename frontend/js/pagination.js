@@ -13,19 +13,44 @@ class Pagination {
         this.totalPages = this.itemsPerPage === 0 ? 1 : Math.ceil(count / this.itemsPerPage);
         if (this.currentPage > this.totalPages) this.currentPage = this.totalPages;
         if (this.currentPage < 1) this.currentPage = 1;
+        // Уведомляем об изменении после установки общего количества
+        this.notifyPageChange();
     }
 
     setItemsPerPage(size) {
         this.itemsPerPage = size;
+        // Сохраняем текущую страницу, но корректируем если она выходит за пределы
+        const oldPage = this.currentPage;
         this.setTotalItems(this.totalItems);
-        this.currentPage = 1;
-        this.notifyPageChange();
+        // Если страница изменилась из-за нового размера, уведомляем
+        if (oldPage !== this.currentPage) {
+            this.notifyPageChange();
+        } else {
+            // Даже если страница не изменилась, нужно обновить отображение
+            this.notifyPageChange();
+        }
     }
 
     goToPage(page) {
         if (page < 1 || page > this.totalPages || page === this.currentPage) return;
         this.currentPage = page;
         this.notifyPageChange();
+    }
+
+    firstPage() {
+        this.goToPage(1);
+    }
+
+    lastPage() {
+        this.goToPage(this.totalPages);
+    }
+
+    prevPage() {
+        this.goToPage(this.currentPage - 1);
+    }
+
+    nextPage() {
+        this.goToPage(this.currentPage + 1);
     }
 
     getCurrentPageData(data) {
@@ -45,7 +70,14 @@ class Pagination {
             ? this.totalItems 
             : Math.min(this.currentPage * this.itemsPerPage, this.totalItems);
         
-        return { startIndex, endIndex, totalItems: this.totalItems };
+        return { 
+            startIndex: startIndex, 
+            endIndex: endIndex, 
+            totalItems: this.totalItems,
+            currentPage: this.currentPage,
+            totalPages: this.totalPages,
+            itemsPerPage: this.itemsPerPage
+        };
     }
 
     onPageChange(callback) {
